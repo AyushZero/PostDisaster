@@ -27,7 +27,7 @@ export function useCSVParser(): UseCSVParserReturn {
 
           if (results.errors.length > 0) {
             const errorMessage = results.errors
-              .map((e) => e.message)
+              .map((e: any) => e.message)
               .join(', ');
             setError(errorMessage);
             reject(new Error(errorMessage));
