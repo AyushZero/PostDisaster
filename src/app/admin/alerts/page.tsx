@@ -19,7 +19,7 @@ export default function AlertsPage() {
         .order('issued_at', { ascending: false });
 
       if (data) {
-        setAlerts(data.map((a) => ({ ...a, disaster: a.disasters })));
+        setAlerts(data.map((a: any) => ({ ...a, disaster: a.disasters })));
       }
       setIsLoading(false);
     };

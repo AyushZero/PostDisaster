@@ -40,7 +40,7 @@ export default function InfrastructurePage() {
         .order('created_at', { ascending: false });
 
       if (data) {
-        setPoints(data.map((p) => ({ ...p, disaster: p.disasters })));
+        setPoints(data.map((p: any) => ({ ...p, disaster: p.disasters })));
       }
       setIsLoading(false);
     };
