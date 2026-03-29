@@ -52,9 +52,7 @@ export default function AdminLoginPage() {
     const checkExistingSession = async () => {
       try {
         const supabase = createClient();
-        const {
-          data: { session },
-        } = await withSupabaseAuthLockRetry(() => supabase.auth.getSession(), 2);
+        const { data: { session } } = await withSupabaseAuthLockRetry(() => supabase.auth.getSession(), 2) as any;
 
         if (session?.user) {
           const { data: profile, error: profileError } = await supabase
@@ -100,7 +98,7 @@ export default function AdminLoginPage() {
             password: data.password,
           }),
         2
-      );
+      ) as any;
 
       if (authError) {
         setError(authError.message);
