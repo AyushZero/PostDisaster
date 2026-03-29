@@ -35,7 +35,7 @@ export function useRealtimeSubscription() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'disasters' },
-        (payload) => {
+        (payload: any) => {
           if (payload.eventType === 'INSERT') {
             addDisaster(payload.new as Disaster);
           } else if (payload.eventType === 'UPDATE') {
@@ -45,7 +45,7 @@ export function useRealtimeSubscription() {
           }
         }
       )
-      .subscribe((status) => {
+      .subscribe((status: any) => {
         setIsConnected(status === 'SUBSCRIBED');
       });
 
@@ -55,7 +55,7 @@ export function useRealtimeSubscription() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'alerts' },
-        (payload) => {
+        (payload: any) => {
           if (payload.eventType === 'INSERT') {
             addAlert(payload.new as Alert);
           } else if (payload.eventType === 'DELETE') {
@@ -71,7 +71,7 @@ export function useRealtimeSubscription() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'infrastructure_points' },
-        (payload) => {
+        (payload: any) => {
           if (payload.eventType === 'INSERT') {
             addInfrastructurePoint(payload.new as InfrastructurePoint);
           } else if (payload.eventType === 'UPDATE') {
@@ -89,7 +89,7 @@ export function useRealtimeSubscription() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'affected_areas' },
-        (payload) => {
+        (payload: any) => {
           if (payload.eventType === 'INSERT') {
             addAffectedArea(payload.new as AffectedArea);
           }
@@ -149,7 +149,7 @@ export function useAuth() {
 
     void withSupabaseAuthLockRetry(() => supabase.auth.getSession(), 2)
       .then(({ data: { session } }) => syncUserFromSession(session))
-      .catch((error) => {
+      .catch((error: any) => {
         if (isSupabaseAuthLockError(error)) {
           return;
         }
@@ -159,7 +159,7 @@ export function useAuth() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange((event: any, session: any) => {
       void (async () => {
         if (event === 'SIGNED_OUT') {
           setUser(null);
@@ -167,7 +167,7 @@ export function useAuth() {
         }
 
         await syncUserFromSession(session as { user?: { id: string } | null } | null);
-      })().catch((error) => {
+      })().catch((error: any) => {
         if (isSupabaseAuthLockError(error)) {
           return;
         }

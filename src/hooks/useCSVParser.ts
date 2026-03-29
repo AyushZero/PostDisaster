@@ -22,7 +22,7 @@ export function useCSVParser(): UseCSVParserReturn {
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
-        complete: (results) => {
+        complete: (results: any) => {
           setIsLoading(false);
 
           if (results.errors.length > 0) {
@@ -37,7 +37,7 @@ export function useCSVParser(): UseCSVParserReturn {
           const rows = results.data as CSVDisasterRow[];
           
           // Validate required fields
-          const validRows = rows.filter((row) => {
+          const validRows = rows.filter((row: any) => {
             return row.area_name && row.severity;
           });
 
@@ -49,7 +49,7 @@ export function useCSVParser(): UseCSVParserReturn {
 
           resolve(validRows);
         },
-        error: (parseError) => {
+        error: (parseError: any) => {
           setIsLoading(false);
           setError(parseError.message);
           reject(parseError);
