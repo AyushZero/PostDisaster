@@ -148,7 +148,7 @@ export function useAuth() {
     };
 
     void withSupabaseAuthLockRetry(() => supabase.auth.getSession(), 2)
-      .then(({ data: { session } }) => syncUserFromSession(session))
+      .then(({ data: { session } }: any) => syncUserFromSession(session))
       .catch((error: any) => {
         if (isSupabaseAuthLockError(error)) {
           return;
