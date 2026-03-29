@@ -320,23 +320,23 @@ export default function PublicDashboard() {
                 <CardContent>
                   <div className="space-y-2">
                     <div className="flex justify-between p-2 bg-red-50 rounded">
-                      <span className="font-medium">National Emergency</span>
+                      <span className="font-medium text-black">National Emergency</span>
                       <a href="tel:112" className="text-red-600 font-bold">112</a>
                     </div>
                     <div className="flex justify-between p-2 bg-slate-50 rounded">
-                      <span>Ambulance</span>
+                      <span className="text-black">Ambulance</span>
                       <a href="tel:108" className="text-slate-900 font-medium">108</a>
                     </div>
                     <div className="flex justify-between p-2 bg-slate-50 rounded">
-                      <span>Police</span>
+                      <span className="text-black">Police</span>
                       <a href="tel:100" className="text-slate-900 font-medium">100</a>
                     </div>
                     <div className="flex justify-between p-2 bg-slate-50 rounded">
-                      <span>Fire</span>
+                      <span className="text-black">Fire</span>
                       <a href="tel:101" className="text-slate-900 font-medium">101</a>
                     </div>
                     <div className="flex justify-between p-2 bg-slate-50 rounded">
-                      <span>Disaster Management</span>
+                      <span className="text-black">Disaster Management</span>
                       <a href="tel:1078" className="text-slate-900 font-medium">1078</a>
                     </div>
                   </div>

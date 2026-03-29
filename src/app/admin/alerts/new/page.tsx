@@ -165,7 +165,7 @@ export default function NewAlertPage() {
               </label>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-60 overflow-y-auto border rounded-lg p-3">
                 {INDIAN_STATES.map((state) => (
-                  <label key={state} className="flex items-center gap-2 text-sm">
+                  <label key={state} className="flex items-center gap-2 text-sm text-black">
                     <input
                       type="checkbox"
                       value={state}

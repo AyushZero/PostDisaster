@@ -258,7 +258,7 @@ export default function NewDisasterPage() {
               </label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 max-h-60 overflow-y-auto border rounded-lg p-3">
                 {INDIAN_STATES.map((state) => (
-                  <label key={state} className="flex items-center gap-2 text-sm">
+                  <label key={state} className="flex items-center gap-2 text-sm text-black">
                     <input
                       type="checkbox"
                       value={state}
@@ -284,7 +284,7 @@ export default function NewDisasterPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex gap-4 items-end">
-                <div className="flex-1">
+                <div className="flex-1 min-w-[300px]">
                   <Input
                     label="Area Name"
                     placeholder="e.g., Pune City Center"
