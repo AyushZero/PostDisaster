@@ -5,7 +5,7 @@ variable "project_name" {
 
 variable "aws_region" {
   type    = string
-  default = "us-east-1"
+  default = "eu-north-1"
 }
 
 variable "vpc_cidr" {
