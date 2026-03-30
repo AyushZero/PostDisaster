@@ -3,7 +3,6 @@ pipeline {
 
     parameters {
         choice(name: 'DEPLOY_SCOPE', choices: ['dev', 'staging', 'prod', 'all'], description: 'Where to deploy after CI passes')
-        string(name: 'DOCKERHUB_NAMESPACE', defaultValue: 'replace-me', description: 'Docker Hub namespace used for image push')
         booleanParam(name: 'APPLY_INFRA', defaultValue: false, description: 'Run terraform apply (false = plan only)')
         booleanParam(name: 'STRICT_LINT', defaultValue: false, description: 'Fail the build if lint reports errors')
         booleanParam(name: 'ROLLBACK_DEPLOY', defaultValue: false, description: 'Deploy rollback tag instead of current build')
@@ -12,6 +11,7 @@ pipeline {
 
     environment {
         APP_NAME = 'post-disaster-alert'
+        DOCKERHUB_NAMESPACE = 'ayushzero'
         NEXT_PUBLIC_SUPABASE_URL = credentials('SUPABASE_URL')
         NEXT_PUBLIC_SUPABASE_ANON_KEY = credentials('SUPABASE_ANON_KEY')
     }
@@ -55,7 +55,7 @@ pipeline {
                 script {
                     def shortSha = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
                     env.APP_IMAGE_TAG = "${BUILD_NUMBER}-${shortSha}"
-                    env.DOCKER_IMAGE_REPOSITORY = "${params.DOCKERHUB_NAMESPACE}/${env.APP_NAME}"
+                    env.DOCKER_IMAGE_REPOSITORY = "${env.DOCKERHUB_NAMESPACE}/${env.APP_NAME}"
                 }
 
                 sh '''
