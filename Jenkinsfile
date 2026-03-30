@@ -128,8 +128,19 @@ pipeline {
             echo 'Pipeline failed. Check terraform/ansible/docker logs in this build.'
         }
         always {
-            sh 'docker image prune -f || true'
-            archiveArtifacts artifacts: 'terraform/environments/**/tfplan, ansible/inventories/**/hosts.generated.yml', allowEmptyArchive: true
+            script {
+                try {
+                    sh 'docker image prune -f || true'
+                } catch (err) {
+                    echo "Skipping docker prune because workspace/agent context is unavailable: ${err}"
+                }
+
+                try {
+                    archiveArtifacts artifacts: 'terraform/environments/**/tfplan, ansible/inventories/**/hosts.generated.yml', allowEmptyArchive: true
+                } catch (err) {
+                    echo "Skipping artifact archive because workspace/agent context is unavailable: ${err}"
+                }
+            }
         }
     }
 }
