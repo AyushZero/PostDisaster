@@ -95,8 +95,7 @@ pipeline {
                         sh "bash scripts/jenkins/tf_plan_apply.sh ${target} ${params.APPLY_INFRA}"
 
                         if (!params.APPLY_INFRA) {
-                            echo "Skipping provision/deploy for ${target} because APPLY_INFRA=false"
-                            continue
+                            echo "Skipping terraform apply for ${target} because APPLY_INFRA=false; continuing with Ansible deploy on existing infrastructure"
                         }
 
                         withCredentials([

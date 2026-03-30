@@ -30,11 +30,16 @@ if [[ "${APPLY_MODE}" == "true" ]]; then
   terraform apply -input=false -auto-approve tfplan
 fi
 
-if [[ "${APPLY_MODE}" == "true" ]]; then
-  APP_IP="$(terraform output -raw app_public_ip)"
-  SSH_USER="$(terraform output -raw ssh_user)"
-  popd >/dev/null
+set +e
+APP_IP="$(terraform output -raw app_public_ip 2>/dev/null)"
+APP_IP_RC=$?
+SSH_USER="$(terraform output -raw ssh_user 2>/dev/null)"
+SSH_USER_RC=$?
+set -e
 
+popd >/dev/null
+
+if [[ ${APP_IP_RC} -eq 0 && ${SSH_USER_RC} -eq 0 && -n "${APP_IP}" && -n "${SSH_USER}" ]]; then
   GENERATED_INVENTORY="ansible/inventories/${ENVIRONMENT}/hosts.generated.yml"
   cat > "${GENERATED_INVENTORY}" <<EOF
 ---
@@ -50,5 +55,8 @@ EOF
   echo "Generated ${GENERATED_INVENTORY}"
   echo "App host IP: ${APP_IP}"
 else
-  popd >/dev/null
+  echo "Terraform outputs not available for ${ENVIRONMENT}; inventory was not generated."
+  if [[ "${APPLY_MODE}" != "true" ]]; then
+    echo "Run with APPLY_INFRA=true at least once for ${ENVIRONMENT}, or ensure terraform state/outputs exist."
+  fi
 fi
