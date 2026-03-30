@@ -37,6 +37,18 @@ export ANSIBLE_ROLES_PATH="${REPO_ROOT}/ansible/roles${ANSIBLE_ROLES_PATH:+:${AN
 export ANSIBLE_HOST_KEY_CHECKING="False"
 export ANSIBLE_SSH_COMMON_ARGS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null${ANSIBLE_SSH_COMMON_ARGS:+ ${ANSIBLE_SSH_COMMON_ARGS}}"
 
+if [[ -n "${SSH_PRIVATE_KEY_FILE:-}" ]]; then
+  if [[ ! -f "${SSH_PRIVATE_KEY_FILE}" ]]; then
+    echo "SSH private key file does not exist: ${SSH_PRIVATE_KEY_FILE}"
+    exit 1
+  fi
+  export ANSIBLE_PRIVATE_KEY_FILE="${SSH_PRIVATE_KEY_FILE}"
+fi
+
+if [[ -n "${SSH_REMOTE_USER:-}" ]]; then
+  export ANSIBLE_REMOTE_USER="${SSH_REMOTE_USER}"
+fi
+
 if [[ "${ACTION}" == "provision" ]]; then
   ansible-playbook -i "${INVENTORY_FILE}" ansible/playbooks/provision.yml
 elif [[ "${ACTION}" == "rollback" ]]; then
