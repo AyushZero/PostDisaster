@@ -1,0 +1,25 @@
+---
+- name: Install docker on Amazon Linux
+  ansible.builtin.yum:
+    name: docker
+    state: present
+  when: ansible_os_family == 'RedHat'
+
+- name: Install docker on Debian/Ubuntu
+  ansible.builtin.apt:
+    name: docker.io
+    state: present
+    update_cache: true
+  when: ansible_os_family == 'Debian'
+
+- name: Ensure docker service is enabled and running
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Add remote user to docker group
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: true

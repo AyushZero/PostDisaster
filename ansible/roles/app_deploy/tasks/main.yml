@@ -1,0 +1,56 @@
+---
+- name: Ensure app working directory exists
+  ansible.builtin.file:
+    path: "{{ app_workdir }}"
+    state: directory
+    mode: '0755'
+
+- name: Render application environment file
+  ansible.builtin.template:
+    src: app.env.j2
+    dest: "{{ app_env_file }}"
+    mode: '0600'
+
+- name: Docker login when credentials are supplied
+  ansible.builtin.shell: |
+    set -e
+    echo "${DOCKER_REGISTRY_PASSWORD}" | docker login -u "${DOCKER_REGISTRY_USERNAME}" --password-stdin
+  environment:
+    DOCKER_REGISTRY_USERNAME: "{{ lookup('env', 'DOCKER_REGISTRY_USERNAME') | default('', true) }}"
+    DOCKER_REGISTRY_PASSWORD: "{{ lookup('env', 'DOCKER_REGISTRY_PASSWORD') | default('', true) }}"
+  args:
+    executable: /bin/bash
+  when:
+    - lookup('env', 'DOCKER_REGISTRY_USERNAME') | length > 0
+    - lookup('env', 'DOCKER_REGISTRY_PASSWORD') | length > 0
+
+- name: Pull desired application image
+  ansible.builtin.command:
+    cmd: "docker pull {{ app_image_repository }}:{{ app_image_tag }}"
+
+- name: Stop existing container if present
+  ansible.builtin.command:
+    cmd: "docker rm -f {{ app_container_name }}"
+  register: remove_container
+  changed_when: remove_container.rc == 0
+  failed_when: false
+
+- name: Start application container
+  ansible.builtin.command:
+    cmd: >-
+      docker run -d
+      --name {{ app_container_name }}
+      --restart unless-stopped
+      -p {{ app_host_port }}:{{ app_port }}
+      --env-file {{ app_env_file }}
+      {{ app_image_repository }}:{{ app_image_tag }}
+
+- name: Wait for health endpoint
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ app_host_port }}{{ app_health_path }}"
+    method: GET
+    status_code: 200
+  register: health_check
+  retries: 12
+  delay: 5
+  until: health_check.status == 200

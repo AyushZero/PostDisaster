@@ -1,0 +1,8 @@
+---
+- name: Roll back app container to previous image tag
+  hosts: app
+  become: true
+  vars:
+    app_image_tag: "{{ rollback_image_tag }}"
+  roles:
+    - app_deploy

@@ -1,0 +1,6 @@
+---
+- name: Provision app hosts
+  hosts: app
+  become: true
+  roles:
+    - common

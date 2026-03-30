@@ -1,0 +1,6 @@
+---
+- name: Deploy app container
+  hosts: app
+  become: true
+  roles:
+    - app_deploy

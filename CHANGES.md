@@ -1,5 +1,32 @@
 # Post Disaster Alert System - Simplified for Emergency Use
 
+## Infrastructure and CI/CD Expansion (March 2026)
+
+### Added
+
+1. Multi-environment Jenkins pipeline in [Jenkinsfile](./Jenkinsfile):
+   - Docker image build and push
+   - Terraform plan/apply for dev/staging/prod
+   - Ansible provision/deploy/rollback flow
+   - Health validation using `/api/health`
+2. Terraform structure under `terraform/`:
+   - Reusable modules (`network`, `compute`)
+   - Environment stacks (`dev`, `staging`, `prod`)
+3. Ansible structure under `ansible/`:
+   - Inventories per environment
+   - Playbooks: provision, deploy, rollback
+   - Roles: common and app_deploy
+4. Jenkins helper scripts under `scripts/jenkins/`:
+   - `validate_stack.sh`
+   - `tf_plan_apply.sh`
+   - `ansible_deploy.sh`
+5. API health route in `src/app/api/health/route.ts` for deterministic smoke checks.
+
+### Updated
+
+1. [README.md](./README.md) with Terraform + Ansible + Docker + Jenkins flow and validation commands.
+2. [JENKINS_SETUP.md](./JENKINS_SETUP.md) with end-to-end multi-tool pipeline execution steps.
+
 ## What Changed
 
 This application has been simplified for emergency/public use:

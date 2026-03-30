@@ -27,8 +27,8 @@ A real-time disaster alert and information system for India, covering earthquake
 - **Authentication**: Supabase Auth
 - **Real-time**: Supabase Realtime
 - **Maps**: Leaflet.js with OpenStreetMap
-- **Deployment**: Vercel
-- **DevOps**: Docker, GitHub Actions
+- **Deployment**: Vercel / AWS EC2
+- **CI/CD**: Jenkins, Docker, Terraform, Ansible
 
 ## Quick Start
 
@@ -62,6 +62,45 @@ npm run dev
 
 For detailed setup instructions, see [SETUP_INSTRUCTIONS.md](./SETUP_INSTRUCTIONS.md)
 
+## Jenkins CI/CD (AWS Free Tier)
+
+For full setup instructions, see [JENKINS_SETUP.md](./JENKINS_SETUP.md).
+
+The implemented pipeline now includes:
+- CI checks (`npm ci`, lint, build)
+- Docker image build and push to Docker Hub
+- Terraform plan/apply per environment (`dev`, `staging`, `prod`)
+- Ansible provisioning and deployment
+- Health verification using `/api/health`
+- Rollback option using a specific image tag
+
+### CI/CD Quick Commands
+
+Local validation:
+
+```bash
+npm ci
+npm run lint
+npm run build
+docker build -t post-disaster-alert:local .
+```
+
+Terraform (example for dev):
+
+```bash
+cd terraform/environments/dev
+terraform init
+terraform validate
+terraform plan
+```
+
+Ansible syntax checks:
+
+```bash
+ansible-playbook -i ansible/inventories/dev/hosts.yml ansible/playbooks/provision.yml --syntax-check
+ansible-playbook -i ansible/inventories/dev/hosts.yml ansible/playbooks/deploy.yml --syntax-check
+```
+
 ## Project Structure
 
 ```
@@ -83,6 +122,14 @@ post-disaster-alert/
 │   └── schema.sql         # Database schema
 ├── .github/
 │   └── workflows/         # GitHub Actions CI/CD
+├── jenkins/
+│   ├── install-jenkins.sh # EC2 setup script
+│   └── .env.example       # Environment template
+├── terraform/             # AWS infrastructure as code
+├── ansible/               # Provisioning and deployment playbooks
+├── scripts/
+│   └── jenkins/           # Jenkins helper scripts (terraform + ansible)
+├── Jenkinsfile            # CI/CD Pipeline definition
 ├── Dockerfile             # Docker configuration
 └── docker-compose.yml     # Docker Compose for local dev
 ```

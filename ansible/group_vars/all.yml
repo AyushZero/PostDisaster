@@ -1,0 +1,10 @@
+---
+app_name: post-disaster-alert
+app_container_name: post-disaster-alert-app
+app_port: 3000
+app_host_port: 3000
+app_workdir: /opt/post-disaster-alert
+app_env_file: /opt/post-disaster-alert/app.env
+app_health_path: /api/health
+app_image_repository: "{{ lookup('env', 'DOCKER_IMAGE_REPOSITORY') | default('post-disaster-alert', true) }}"
+app_image_tag: "{{ lookup('env', 'APP_IMAGE_TAG') | default('latest', true) }}"
