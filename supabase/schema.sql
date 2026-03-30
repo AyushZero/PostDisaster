@@ -114,7 +114,6 @@ CREATE POLICY "Enable insert for authenticated users"
 -- RLS Policies for disasters table
 CREATE POLICY "Anyone can view disasters"
     ON public.disasters FOR SELECT
-    TO authenticated
     USING (true);
 
 CREATE POLICY "Admins can create disasters"
@@ -141,7 +140,6 @@ CREATE POLICY "Admins can delete disasters"
 -- RLS Policies for affected_areas table
 CREATE POLICY "Anyone can view affected areas"
     ON public.affected_areas FOR SELECT
-    TO authenticated
     USING (true);
 
 CREATE POLICY "Admins can manage affected areas"
@@ -155,8 +153,7 @@ CREATE POLICY "Admins can manage affected areas"
 CREATE POLICY "Anyone can view infrastructure points"
     ON public.infrastructure_points FOR SELECT
     TO authenticated
-    USING (true);
-
+    
 CREATE POLICY "Admins can manage infrastructure points"
     ON public.infrastructure_points FOR ALL
     TO authenticated
@@ -168,8 +165,7 @@ CREATE POLICY "Admins can manage infrastructure points"
 CREATE POLICY "Anyone can view active alerts"
     ON public.alerts FOR SELECT
     TO authenticated
-    USING (true);
-
+    
 CREATE POLICY "Admins can manage alerts"
     ON public.alerts FOR ALL
     TO authenticated
@@ -182,8 +178,7 @@ CREATE POLICY "Anyone can view emergency contacts"
     ON public.emergency_contacts FOR SELECT
     TO authenticated
     USING (true);
-
-CREATE POLICY "Admins can manage emergency contacts"
+TE POLICY "Admins can manage emergency contacts"
     ON public.emergency_contacts FOR ALL
     TO authenticated
     USING (
