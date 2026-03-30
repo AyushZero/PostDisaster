@@ -2,5 +2,7 @@
 - name: Provision app hosts
   hosts: app
   become: true
+  vars_files:
+    - ../group_vars/all.yml
   roles:
     - common

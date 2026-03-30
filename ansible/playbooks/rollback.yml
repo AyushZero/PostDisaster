@@ -2,6 +2,8 @@
 - name: Roll back app container to previous image tag
   hosts: app
   become: true
+  vars_files:
+    - ../group_vars/all.yml
   vars:
     app_image_tag: "{{ rollback_image_tag }}"
   roles:
