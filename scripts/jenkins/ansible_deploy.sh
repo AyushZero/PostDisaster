@@ -30,16 +30,18 @@ if [[ ! -f "${INVENTORY_FILE}" ]]; then
 fi
 
 export APP_IMAGE_TAG="${IMAGE_TAG}"
-ANSIBLE_ROLES_PATH="ansible/roles"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+export ANSIBLE_ROLES_PATH="${REPO_ROOT}/ansible/roles${ANSIBLE_ROLES_PATH:+:${ANSIBLE_ROLES_PATH}}"
 
 if [[ "${ACTION}" == "provision" ]]; then
-  ansible-playbook -i "${INVENTORY_FILE}" --roles-path "${ANSIBLE_ROLES_PATH}" ansible/playbooks/provision.yml
+  ansible-playbook -i "${INVENTORY_FILE}" ansible/playbooks/provision.yml
 elif [[ "${ACTION}" == "rollback" ]]; then
   if [[ -z "${ROLLBACK_TAG}" ]]; then
     echo "rollback tag is required when ACTION=rollback"
     exit 1
   fi
-  ansible-playbook -i "${INVENTORY_FILE}" --roles-path "${ANSIBLE_ROLES_PATH}" ansible/playbooks/rollback.yml -e "rollback_image_tag=${ROLLBACK_TAG}"
+  ansible-playbook -i "${INVENTORY_FILE}" ansible/playbooks/rollback.yml -e "rollback_image_tag=${ROLLBACK_TAG}"
 else
-  ansible-playbook -i "${INVENTORY_FILE}" --roles-path "${ANSIBLE_ROLES_PATH}" ansible/playbooks/deploy.yml
+  ansible-playbook -i "${INVENTORY_FILE}" ansible/playbooks/deploy.yml
 fi
