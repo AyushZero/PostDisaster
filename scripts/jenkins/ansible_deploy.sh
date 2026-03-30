@@ -33,6 +33,9 @@ export APP_IMAGE_TAG="${IMAGE_TAG}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 export ANSIBLE_ROLES_PATH="${REPO_ROOT}/ansible/roles${ANSIBLE_ROLES_PATH:+:${ANSIBLE_ROLES_PATH}}"
+# CI deploys target freshly created/recreated hosts, so avoid interactive host key prompts.
+export ANSIBLE_HOST_KEY_CHECKING="False"
+export ANSIBLE_SSH_COMMON_ARGS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null${ANSIBLE_SSH_COMMON_ARGS:+ ${ANSIBLE_SSH_COMMON_ARGS}}"
 
 if [[ "${ACTION}" == "provision" ]]; then
   ansible-playbook -i "${INVENTORY_FILE}" ansible/playbooks/provision.yml
