@@ -17,6 +17,7 @@ interface AppState {
   alerts: Alert[];
   setAlerts: (alerts: Alert[]) => void;
   addAlert: (alert: Alert) => void;
+  updateAlert: (alert: Alert) => void;
   removeAlert: (id: string) => void;
 
   // Infrastructure state
@@ -30,6 +31,8 @@ interface AppState {
   affectedAreas: AffectedArea[];
   setAffectedAreas: (areas: AffectedArea[]) => void;
   addAffectedArea: (area: AffectedArea) => void;
+  updateAffectedArea: (area: AffectedArea) => void;
+  removeAffectedArea: (id: string) => void;
 
   // Emergency contacts state
   emergencyContacts: EmergencyContact[];
@@ -76,6 +79,10 @@ export const useAppStore = create<AppState>((set) => ({
   setAlerts: (alerts) => set({ alerts }),
   addAlert: (alert) =>
     set((state) => ({ alerts: [alert, ...state.alerts] })),
+  updateAlert: (alert) =>
+    set((state) => ({
+      alerts: state.alerts.map((a) => (a.id === alert.id ? alert : a)),
+    })),
   removeAlert: (id) =>
     set((state) => ({
       alerts: state.alerts.filter((a) => a.id !== id),
@@ -104,6 +111,14 @@ export const useAppStore = create<AppState>((set) => ({
   setAffectedAreas: (areas) => set({ affectedAreas: areas }),
   addAffectedArea: (area) =>
     set((state) => ({ affectedAreas: [...state.affectedAreas, area] })),
+  updateAffectedArea: (area) =>
+    set((state) => ({
+      affectedAreas: state.affectedAreas.map((a) => (a.id === area.id ? area : a)),
+    })),
+  removeAffectedArea: (id) =>
+    set((state) => ({
+      affectedAreas: state.affectedAreas.filter((a) => a.id !== id),
+    })),
 
   // Emergency contacts
   emergencyContacts: [],

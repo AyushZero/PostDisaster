@@ -18,11 +18,14 @@ export function useRealtimeSubscription() {
     updateDisaster,
     removeDisaster,
     addAlert,
+    updateAlert,
     removeAlert,
     addInfrastructurePoint,
     updateInfrastructurePoint,
     removeInfrastructurePoint,
     addAffectedArea,
+    updateAffectedArea,
+    removeAffectedArea,
     setIsConnected,
   } = useAppStore();
 
@@ -58,6 +61,8 @@ export function useRealtimeSubscription() {
         (payload: any) => {
           if (payload.eventType === 'INSERT') {
             addAlert(payload.new as Alert);
+          } else if (payload.eventType === 'UPDATE') {
+            updateAlert(payload.new as Alert);
           } else if (payload.eventType === 'DELETE') {
             removeAlert(payload.old.id);
           }
@@ -92,6 +97,10 @@ export function useRealtimeSubscription() {
         (payload: any) => {
           if (payload.eventType === 'INSERT') {
             addAffectedArea(payload.new as AffectedArea);
+          } else if (payload.eventType === 'UPDATE') {
+            updateAffectedArea(payload.new as AffectedArea);
+          } else if (payload.eventType === 'DELETE') {
+            removeAffectedArea(payload.old.id);
           }
         }
       )
@@ -108,11 +117,14 @@ export function useRealtimeSubscription() {
     updateDisaster,
     removeDisaster,
     addAlert,
+    updateAlert,
     removeAlert,
     addInfrastructurePoint,
     updateInfrastructurePoint,
     removeInfrastructurePoint,
     addAffectedArea,
+    updateAffectedArea,
+    removeAffectedArea,
     setIsConnected,
   ]);
 }
