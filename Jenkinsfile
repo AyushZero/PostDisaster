@@ -59,7 +59,10 @@ pipeline {
                 }
 
                 sh '''
-                    docker build -t ${DOCKER_IMAGE_REPOSITORY}:${APP_IMAGE_TAG} .
+                    docker build \
+                        --build-arg NEXT_PUBLIC_SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL}" \
+                        --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="${NEXT_PUBLIC_SUPABASE_ANON_KEY}" \
+                        -t ${DOCKER_IMAGE_REPOSITORY}:${APP_IMAGE_TAG} .
                     docker tag ${DOCKER_IMAGE_REPOSITORY}:${APP_IMAGE_TAG} ${DOCKER_IMAGE_REPOSITORY}:latest
                 '''
             }
