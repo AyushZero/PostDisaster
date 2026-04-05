@@ -96,3 +96,34 @@ Or click "Use Test Admin Credentials" button.
 2. Open admin panel in another browser/incognito
 3. As admin, issue a new alert
 4. Alert appears immediately on public dashboard
+
+---
+
+## Optional: Prometheus + Grafana (Local Monitoring)
+
+### Start Monitoring Stack
+
+```bash
+docker compose --profile monitoring up -d app db prometheus grafana node-exporter blackbox-exporter
+```
+
+### Access Dashboards
+
+- Prometheus: http://localhost:9090
+- Grafana: http://localhost:3001
+   - Username: `admin`
+   - Password: `admin`
+
+### Default Metrics Included
+
+- Prometheus internal metrics
+- Node/container host metrics via node-exporter
+- HTTP availability probes for:
+   - App health endpoint (`/api/health`)
+   - Grafana health endpoint
+
+### Stop Monitoring Stack
+
+```bash
+docker compose --profile monitoring down
+```

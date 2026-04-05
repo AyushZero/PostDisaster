@@ -1,0 +1,78 @@
+flowchart TD
+  U[You] --> EC2[Launch AWS EC2 Jenkins Host]
+  EC2 --> Setup[Install Jenkins Docker Node Terraform Ansible]
+  Setup --> JenkinsReady[Jenkins Pipeline Job Configured]
+
+  Git[GitHub Repository] -->|Webhook or Manual Build| Jenkins[Jenkins]
+  JenkinsReady --> Jenkins
+
+  subgraph CI[CI Stage]
+    Checkout[Checkout Source]
+    Validate[Validate Toolchain]
+    NpmCI[npm ci]
+    LintBuild[Lint and Build]
+    DockerBuild[Build Docker Image]
+    DockerPush[Push Image to Docker Hub]
+    Checkout --> Validate --> NpmCI --> LintBuild --> DockerBuild --> DockerPush
+  end
+
+  Jenkins --> CI
+
+  DockerPush --> Scope{DEPLOY_SCOPE}
+  Scope --> Dev[dev]
+  Scope --> Staging[staging]
+  Scope --> Prod[prod]
+  Scope --> All[all -> dev staging prod]
+
+  subgraph Infra[Terraform + Inventory]
+    TfInit[terraform init]
+    TfValidate[terraform validate]
+    TfPlan[terraform plan]
+    ApplyCheck{APPLY_INFRA=true}
+    TfApply[terraform apply]
+    OutputRead[Read outputs app_public_ip ssh_user]
+    GenInv[Generate hosts.generated.yml]
+    TfInit --> TfValidate --> TfPlan --> ApplyCheck
+    ApplyCheck -->|yes| TfApply --> OutputRead --> GenInv
+    ApplyCheck -->|no| OutputRead
+  end
+
+  Dev --> Infra
+  Staging --> Infra
+  Prod --> ProdGate{Manual Approval for prod}
+  ProdGate --> Infra
+  All --> Infra
+
+  subgraph Deploy[Ansible Deploy]
+    Provision[Run provision.yml]
+    RollbackChoice{ROLLBACK_DEPLOY=true}
+    DeployNow[Run deploy.yml]
+    RollbackNow[Run rollback.yml with ROLLBACK_TAG]
+    Provision --> RollbackChoice
+    RollbackChoice -->|no| DeployNow
+    RollbackChoice -->|yes| RollbackNow
+  end
+
+  GenInv --> Deploy
+  Deploy --> Health[curl http://app_public_ip:3000/api/health]
+  Health --> Done[Deployment Complete]
+
+  subgraph Obs[Observability Prometheus and Grafana]
+    ObsStart[Enable monitoring profile services]
+    NodeExp[node-exporter]
+    Blackbox[blackbox-exporter]
+    Prometheus[prometheus]
+    Grafana[grafana]
+    Dashboards[Dashboards and alerts]
+
+    ObsStart --> NodeExp --> Prometheus
+    ObsStart --> Blackbox --> Prometheus
+    Prometheus --> Grafana --> Dashboards
+  end
+
+  Deploy --> ObsStart
+  Blackbox --> ProbeApp[Probe app /api/health]
+  ProbeApp --> Health
+
+  Supabase[Supabase URL and Anon Key from Jenkins Credentials] --> DockerBuild
+  DockerHub[Docker Hub Registry] --> Deploy

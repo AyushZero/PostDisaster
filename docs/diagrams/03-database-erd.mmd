@@ -1,0 +1,83 @@
+erDiagram
+  AUTH_USERS {
+    uuid id PK
+  }
+
+  USERS {
+    uuid id PK
+    text email
+    text full_name
+    text role
+    text assigned_state
+    timestamptz created_at
+  }
+
+  DISASTERS {
+    uuid id PK
+    text type
+    text title
+    text description
+    text severity
+    text_array affected_states
+    date start_date
+    date end_date
+    text status
+    uuid created_by FK
+    timestamptz created_at
+    timestamptz updated_at
+  }
+
+  AFFECTED_AREAS {
+    uuid id PK
+    uuid disaster_id FK
+    text name
+    jsonb coordinates
+    text severity_level
+    text description
+    timestamptz created_at
+  }
+
+  INFRASTRUCTURE_POINTS {
+    uuid id PK
+    uuid disaster_id FK
+    text type
+    text name
+    float latitude
+    float longitude
+    text address
+    text contact_info
+    text status
+    text description
+    timestamptz created_at
+    timestamptz updated_at
+  }
+
+  ALERTS {
+    uuid id PK
+    uuid disaster_id FK
+    text title
+    text message
+    text severity
+    text_array affected_states
+    uuid issued_by FK
+    timestamptz issued_at
+    timestamptz expires_at
+    bool is_active
+  }
+
+  EMERGENCY_CONTACTS {
+    uuid id PK
+    text type
+    text name
+    text number
+    text region
+    text description
+    bool is_national
+  }
+
+  AUTH_USERS ||--|| USERS : extends
+  USERS ||--o{ DISASTERS : creates
+  USERS ||--o{ ALERTS : issues
+  DISASTERS ||--o{ AFFECTED_AREAS : contains
+  DISASTERS ||--o{ INFRASTRUCTURE_POINTS : has
+  DISASTERS ||--o{ ALERTS : triggers

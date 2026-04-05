@@ -1,0 +1,22 @@
+flowchart TD
+  subgraph Runtime[AWS Runtime]
+    App[Next.js App Container\n/api/health]
+  end
+
+  subgraph Monitoring[Monitoring Profile Services]
+    Prom[Prometheus]
+    Graf[Grafana]
+    NodeEx[Node Exporter]
+    BB[Blackbox Exporter]
+  end
+
+  NodeEx -->|host metrics| Prom
+  Prom -->|query datasource| Graf
+  BB -->|probe metrics| Prom
+
+  Prom -->|scrape| Prom
+  BB -->|HTTP probe app health| App
+  BB -->|HTTP probe grafana health| Graf
+
+  User[Operator] -->|View dashboards :3001| Graf
+  User -->|View metrics :9090| Prom

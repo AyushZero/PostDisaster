@@ -1,0 +1,41 @@
+sequenceDiagram
+  autonumber
+  participant You
+  participant GitHub
+  participant Jenkins
+  participant DockerHub
+  participant Terraform
+  participant AWS as AWS EC2 App Host
+  participant Ansible
+  participant App as App Container
+
+  You->>Jenkins: Start pipeline with parameters
+  GitHub-->>Jenkins: Provide repository source
+  Jenkins->>Jenkins: Validate stack, npm ci, lint, build
+  Jenkins->>Jenkins: Build image with Supabase build args
+  Jenkins->>DockerHub: Push image tag and latest
+
+  loop For each target environment
+    Jenkins->>Terraform: init, validate, plan
+    alt APPLY_INFRA is true
+      Terraform-->>AWS: create or update VPC subnet SG EC2
+      Jenkins->>Terraform: read app_public_ip and ssh_user
+      Jenkins->>Jenkins: generate ansible hosts.generated.yml
+    else APPLY_INFRA is false
+      Jenkins->>Terraform: try reading existing outputs
+    end
+
+    Jenkins->>Ansible: run provision.yml
+    alt ROLLBACK_DEPLOY is true
+      Jenkins->>Ansible: run rollback.yml with ROLLBACK_TAG
+    else ROLLBACK_DEPLOY is false
+      Jenkins->>Ansible: run deploy.yml with APP_IMAGE_TAG
+    end
+
+    Ansible->>AWS: docker pull and docker run
+    AWS->>App: start container on port 3000
+    Jenkins->>App: GET /api/health
+    App-->>Jenkins: 200 OK
+  end
+
+  Jenkins-->>You: Build success with image tag

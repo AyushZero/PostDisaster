@@ -1,0 +1,46 @@
+flowchart LR
+  subgraph Clients[Client Layer]
+    PublicUser[Public User Browser]
+    AdminUser[Admin Browser]
+  end
+
+  subgraph AWS[AWS Account]
+    subgraph VPC[VPC per Environment]
+      Subnet[Public Subnet]
+      SG[Security Group\nIngress 3000 and 22]
+      EC2App[EC2 App Host\nDocker Container\nNext.js App]
+      Subnet --> SG --> EC2App
+    end
+
+    JenkinsHost[EC2 Jenkins Host\nCI/CD Orchestrator]
+  end
+
+  PublicUser -->|HTTP 3000| EC2App
+  AdminUser -->|HTTP 3000| EC2App
+
+  subgraph Data[Supabase]
+    Auth[Auth]
+    PG[(PostgreSQL)]
+    RT[Realtime]
+  end
+
+  EC2App --> Auth
+  EC2App --> PG
+  EC2App --> RT
+
+  JenkinsHost -->|Pull Source| GitHub[GitHub Repository]
+  JenkinsHost -->|Build and Push Images| DockerHub[Docker Hub]
+  JenkinsHost -->|terraform plan apply| VPC
+  JenkinsHost -->|ansible provision deploy rollback| EC2App
+
+  subgraph OptionalLocal[Optional Local Monitoring Profile]
+    Prom[Prometheus]
+    Gf[Grafana]
+    NodeEx[Node Exporter]
+    BB[Blackbox Exporter]
+  end
+
+  Prom --> Gf
+  NodeEx --> Prom
+  BB --> Prom
+  BB -->|Probe /api/health| EC2App
