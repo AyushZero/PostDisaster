@@ -170,10 +170,17 @@
       ansible.builtin.pause:
         seconds: 3
 
-    - name: Check Alertmanager container status
+    - name: Check if Alertmanager container exists and is running
       ansible.builtin.shell:
-        cmd: "docker inspect {{ alertmanager_container_name }} -f '{{\"Status\"}}:{{.State.Status}} {{\"Running\"}}:{{.State.Running}} {{\"Error\"}}:{{.State.Error}}'"
+        cmd: "docker ps -a --filter 'name={{ alertmanager_container_name }}' --format 'table {{.Names}}\t{{.Status}}'"
       register: container_status
+      changed_when: false
+      failed_when: false
+
+    - name: Get full Alertmanager logs
+      ansible.builtin.shell:
+        cmd: "docker logs {{ alertmanager_container_name }} 2>&1 || echo 'FAILED TO GET LOGS - container may not exist'"
+      register: alertmanager_logs_full
       changed_when: false
       failed_when: false
 
@@ -183,24 +190,24 @@
       register: alertmanager_config_content
       failed_when: false
 
-    - name: Get full Alertmanager logs
-      ansible.builtin.command:
-        cmd: "docker logs {{ alertmanager_container_name }}"
-      register: alertmanager_logs_full
-      changed_when: false
-      failed_when: false
-
     - name: Try direct health check via docker exec
-      ansible.builtin.command:
-        cmd: "docker exec {{ alertmanager_container_name }} wget -O- http://localhost:9093/-/healthy"
+      ansible.builtin.shell:
+        cmd: "docker exec {{ alertmanager_container_name }} wget -q -O- http://localhost:9093/-/healthy 2>&1 || echo 'EXEC FAILED - container not running'"
       register: direct_health_check
       changed_when: false
       failed_when: false
 
-    - name: Check if port is listening
-      ansible.builtin.command:
-        cmd: "netstat -tlnp 2>/dev/null | grep {{ alertmanager_host_port }} || echo 'Port not listening'"
+    - name: Check port binding
+      ansible.builtin.shell:
+        cmd: "ss -tlnp 2>/dev/null | grep 9093 || echo 'Port 9093 not listening on any interface'"
       register: port_check
+      changed_when: false
+      failed_when: false
+
+    - name: List all monitoring containers
+      ansible.builtin.shell:
+        cmd: "docker ps -a --filter 'network={{ monitoring_network }}' --format 'table {{.Names}}\t{{.Status}}'"
+      register: all_containers
       changed_when: false
       failed_when: false
 
@@ -209,19 +216,23 @@
         msg: |
           Alertmanager health check failed after 24 retries (120 seconds).
           
-          Container Status: {{ container_status.stdout }}
+          === ALERTMANAGER CONTAINER STATUS ===
+          {{ container_status.stdout }}
           
-          Rendered Config (first 50 lines):
-          {{ alertmanager_config_content.content | default('Could not read config') | b64decode | regex_replace('(?m)^', '  ') }}
+          === ALL MONITORING CONTAINERS ===
+          {{ all_containers.stdout }}
           
-          Docker Logs:
-          {{ alertmanager_logs_full.stdout | regex_replace('(?m)^', '  ') | default('No logs') }}
+          === PORT BINDING STATUS ===
+          {{ port_check.stdout }}
           
-          Direct Health Check (via docker exec):
-          {{ direct_health_check.stdout | regex_replace('(?m)^', '  ') | default('Failed to exec') }}
+          === ALERTMANAGER LOGS ===
+          {{ alertmanager_logs_full.stdout }}
           
-          Port Listening Status:
-          {{ port_check.stdout | regex_replace('(?m)^', '  ') }}
+          === DIRECT HEALTH CHECK (docker exec) ===
+          {{ direct_health_check.stdout }}
+          
+          === RENDERED ALERTMANAGER CONFIG ===
+          {{ alertmanager_config_content.content | default('Could not read config') | b64decode }}
 
 - name: Wait for Prometheus ready endpoint
   ansible.builtin.uri:
