@@ -41,6 +41,14 @@
     dest: "{{ monitoring_config_dir }}/alertmanager.yml"
     mode: '0644'
 
+- name: Ensure Alertmanager config is readable by containers
+  ansible.builtin.file:
+    path: "{{ monitoring_config_dir }}/alertmanager.yml"
+    state: file
+    owner: root
+    group: root
+    mode: '0644'
+
 - name: Render blackbox exporter config
   ansible.builtin.template:
     src: blackbox.yml.j2
