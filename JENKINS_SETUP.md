@@ -160,7 +160,7 @@ Go to Manage Jenkins -> Credentials -> Global and add:
 - Use one of these approaches:
 - recommended: attach IAM role to Jenkins host
 - alternative: add AWS access key credentials and export them in job environment
-
+Test 
 ---
 
 ## 5. Prepare Repository for Jenkins
