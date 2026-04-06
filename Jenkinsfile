@@ -148,7 +148,15 @@ pipeline {
         always {
             script {
                 try {
-                    sh 'docker image prune -f || true'
+                    sh '''
+                        docker image prune -af || true
+                        docker builder prune -af || true
+                        docker container prune -f || true
+                        docker volume prune -f || true
+                        docker system df || true
+                        npm cache clean --force || true
+                        rm -rf .next node_modules || true
+                    '''
                 } catch (err) {
                     echo "Skipping docker prune because workspace/agent context is unavailable: ${err}"
                 }
@@ -157,6 +165,12 @@ pipeline {
                     archiveArtifacts artifacts: 'terraform/environments/**/tfplan, ansible/inventories/**/hosts.generated.yml', allowEmptyArchive: true
                 } catch (err) {
                     echo "Skipping artifact archive because workspace/agent context is unavailable: ${err}"
+                }
+
+                try {
+                    deleteDir()
+                } catch (err) {
+                    echo "Skipping workspace cleanup because workspace/agent context is unavailable: ${err}"
                 }
             }
         }
