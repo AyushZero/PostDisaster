@@ -166,16 +166,62 @@
       delay: 5
       until: alertmanager_health.status == 200
   rescue:
-    - name: Print Alertmanager logs when health check fails
-      ansible.builtin.command:
-        cmd: "docker logs --tail 120 {{ alertmanager_container_name }}"
-      register: alertmanager_logs
+    - name: Give container extra time to stabilize before diagnostics
+      ansible.builtin.pause:
+        seconds: 3
+
+    - name: Check Alertmanager container status
+      ansible.builtin.shell:
+        cmd: "docker inspect {{ alertmanager_container_name }} -f '{{\"Status\"}}:{{.State.Status}} {{\"Running\"}}:{{.State.Running}} {{\"Error\"}}:{{.State.Error}}'"
+      register: container_status
       changed_when: false
       failed_when: false
 
-    - name: Fail monitoring deployment with Alertmanager logs
+    - name: Print rendered Alertmanager config
+      ansible.builtin.slurp:
+        src: "{{ monitoring_config_dir }}/alertmanager.yml"
+      register: alertmanager_config_content
+      failed_when: false
+
+    - name: Get full Alertmanager logs
+      ansible.builtin.command:
+        cmd: "docker logs {{ alertmanager_container_name }}"
+      register: alertmanager_logs_full
+      changed_when: false
+      failed_when: false
+
+    - name: Try direct health check via docker exec
+      ansible.builtin.command:
+        cmd: "docker exec {{ alertmanager_container_name }} wget -O- http://localhost:9093/-/healthy"
+      register: direct_health_check
+      changed_when: false
+      failed_when: false
+
+    - name: Check if port is listening
+      ansible.builtin.command:
+        cmd: "netstat -tlnp 2>/dev/null | grep {{ alertmanager_host_port }} || echo 'Port not listening'"
+      register: port_check
+      changed_when: false
+      failed_when: false
+
+    - name: Fail with comprehensive diagnostics
       ansible.builtin.fail:
-        msg: "Alertmanager health check failed. Logs: {{ alertmanager_logs.stdout | default('no logs available') }}"
+        msg: |
+          Alertmanager health check failed after 24 retries (120 seconds).
+          
+          Container Status: {{ container_status.stdout }}
+          
+          Rendered Config (first 50 lines):
+          {{ alertmanager_config_content.content | default('Could not read config') | b64decode | regex_replace('(?m)^', '  ') }}
+          
+          Docker Logs:
+          {{ alertmanager_logs_full.stdout | regex_replace('(?m)^', '  ') | default('No logs') }}
+          
+          Direct Health Check (via docker exec):
+          {{ direct_health_check.stdout | regex_replace('(?m)^', '  ') | default('Failed to exec') }}
+          
+          Port Listening Status:
+          {{ port_check.stdout | regex_replace('(?m)^', '  ') }}
 
 - name: Wait for Prometheus ready endpoint
   ansible.builtin.uri:
