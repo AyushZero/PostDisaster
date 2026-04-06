@@ -172,7 +172,7 @@
 
     - name: Check if Alertmanager container exists and is running
       ansible.builtin.shell:
-        cmd: "docker ps -a --filter 'name={{ alertmanager_container_name }}' --format 'table {{.Names}}\t{{.Status}}'"
+        cmd: "docker ps -a --filter 'name={{ alertmanager_container_name }}'"
       register: container_status
       changed_when: false
       failed_when: false
@@ -206,7 +206,7 @@
 
     - name: List all monitoring containers
       ansible.builtin.shell:
-        cmd: "docker ps -a --filter 'network={{ monitoring_network }}' --format 'table {{.Names}}\t{{.Status}}'"
+        cmd: "docker ps -a --filter 'network={{ monitoring_network }}'"
       register: all_containers
       changed_when: false
       failed_when: false
