@@ -3,6 +3,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
     ports:
       - "3000:3000"
     environment:
@@ -46,9 +49,7 @@ services:
     image: prom/node-exporter:latest
     profiles: ["monitoring"]
     command:
-      - "--path.rootfs=/host"
-    volumes:
-      - /:/host:ro,rslave
+      - "--web.listen-address=:9100"
     networks:
       - app-network
 
