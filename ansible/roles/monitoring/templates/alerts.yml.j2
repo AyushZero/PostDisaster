@@ -1,0 +1,22 @@
+groups:
+  - name: app-and-monitoring-health
+    rules:
+      - alert: AppHealthProbeFailed
+        expr: probe_success{job="app_health"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          environment: "{{ environment_name }}"
+        annotations:
+          summary: "App health probe is failing"
+          description: "The app health endpoint has been failing for at least 2 minutes in {{ environment_name }}."
+
+      - alert: PrometheusTargetDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: warning
+          environment: "{{ environment_name }}"
+        annotations:
+          summary: "A Prometheus target is down"
+          description: "Target {{ '{{' }} $labels.instance {{ '}}' }} is down in {{ environment_name }}."

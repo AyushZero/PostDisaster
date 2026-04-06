@@ -7,7 +7,7 @@ ACTION="${3:-deploy}"
 ROLLBACK_TAG="${4:-}"
 
 if [[ -z "${ENVIRONMENT}" || -z "${IMAGE_TAG}" ]]; then
-  echo "Usage: $0 <dev|staging|prod> <image_tag> <provision|deploy|rollback> [rollback_tag]"
+  echo "Usage: $0 <dev|staging|prod> <image_tag> <provision|deploy|rollback|monitoring> [rollback_tag]"
   exit 1
 fi
 
@@ -57,6 +57,8 @@ elif [[ "${ACTION}" == "rollback" ]]; then
     exit 1
   fi
   ansible-playbook -i "${INVENTORY_FILE}" ansible/playbooks/rollback.yml -e "rollback_image_tag=${ROLLBACK_TAG}"
+elif [[ "${ACTION}" == "monitoring" ]]; then
+  ansible-playbook -i "${INVENTORY_FILE}" ansible/playbooks/deploy_monitoring.yml
 else
   ansible-playbook -i "${INVENTORY_FILE}" ansible/playbooks/deploy.yml
 fi

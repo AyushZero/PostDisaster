@@ -73,6 +73,30 @@ resource "aws_security_group" "app" {
     cidr_blocks = [var.ssh_ingress_cidr]
   }
 
+  ingress {
+    description = "Prometheus"
+    from_port   = 9090
+    to_port     = 9090
+    protocol    = "tcp"
+    cidr_blocks = [var.monitoring_ingress_cidr]
+  }
+
+  ingress {
+    description = "Grafana"
+    from_port   = 3001
+    to_port     = 3001
+    protocol    = "tcp"
+    cidr_blocks = [var.monitoring_ingress_cidr]
+  }
+
+  ingress {
+    description = "Alertmanager"
+    from_port   = 9093
+    to_port     = 9093
+    protocol    = "tcp"
+    cidr_blocks = [var.monitoring_ingress_cidr]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0

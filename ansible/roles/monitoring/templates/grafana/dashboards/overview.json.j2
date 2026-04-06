@@ -1,0 +1,38 @@
+{
+  "uid": "post-disaster-overview",
+  "title": "Post Disaster Monitoring Overview",
+  "tags": ["monitoring", "post-disaster-alert"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Target Up",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [
+        {"expr": "up", "legendFormat": "{% raw %}{{instance}}{% endraw %}"}
+      ],
+      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8}
+    },
+    {
+      "type": "timeseries",
+      "title": "Probe Success",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [
+        {"expr": "probe_success", "legendFormat": "{% raw %}{{instance}}{% endraw %}"}
+      ],
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8}
+    },
+    {
+      "type": "timeseries",
+      "title": "Prometheus Scrape Duration",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [
+        {"expr": "scrape_duration_seconds", "legendFormat": "{% raw %}{{job}}{% endraw %}"}
+      ],
+      "gridPos": {"x": 0, "y": 8, "w": 24, "h": 8}
+    }
+  ]
+}

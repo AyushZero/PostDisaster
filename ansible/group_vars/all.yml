@@ -8,3 +8,31 @@ app_env_file: /opt/post-disaster-alert/app.env
 app_health_path: /api/health
 app_image_repository: "{{ lookup('env', 'DOCKER_IMAGE_REPOSITORY') | default('post-disaster-alert', true) }}"
 app_image_tag: "{{ lookup('env', 'APP_IMAGE_TAG') | default('latest', true) }}"
+
+deploy_monitoring: "{{ lookup('env', 'DEPLOY_MONITORING') | default('false', true) }}"
+environment_name: "{{ lookup('env', 'DEPLOY_ENVIRONMENT') | default('dev', true) }}"
+slack_webhook_url: "{{ lookup('env', 'SLACK_WEBHOOK_URL') | default('', true) }}"
+
+monitoring_network: post-disaster-alert-monitoring
+monitoring_workdir: /opt/post-disaster-alert/monitoring
+monitoring_config_dir: /opt/post-disaster-alert/monitoring/config
+
+prometheus_container_name: post-disaster-alert-prometheus
+prometheus_image: prom/prometheus:latest
+prometheus_host_port: 9090
+
+grafana_container_name: post-disaster-alert-grafana
+grafana_image: grafana/grafana:latest
+grafana_host_port: 3001
+grafana_admin_user: admin
+grafana_admin_password: admin
+
+alertmanager_container_name: post-disaster-alert-alertmanager
+alertmanager_image: prom/alertmanager:latest
+alertmanager_host_port: 9093
+
+node_exporter_container_name: post-disaster-alert-node-exporter
+node_exporter_image: prom/node-exporter:latest
+
+blackbox_container_name: post-disaster-alert-blackbox-exporter
+blackbox_image: prom/blackbox-exporter:latest

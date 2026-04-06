@@ -152,7 +152,11 @@ Go to Manage Jenkins -> Credentials -> Global and add:
 - username: Docker Hub username
 - password: Docker Hub access token
 
-4. AWS credentials
+4. `SLACK_ALERT_WEBHOOK` (Secret text)
+- value: Slack incoming webhook URL used by Alertmanager
+- required only when `DEPLOY_MONITORING=true`
+
+5. AWS credentials
 - Use one of these approaches:
 - recommended: attach IAM role to Jenkins host
 - alternative: add AWS access key credentials and export them in job environment
@@ -171,6 +175,7 @@ The pipeline already expects these parameters:
 - `DEPLOY_SCOPE`: `dev|staging|prod|all`
 - `DOCKERHUB_NAMESPACE`
 - `APPLY_INFRA`: true/false
+- `DEPLOY_MONITORING`: true/false
 - `ROLLBACK_DEPLOY`: true/false
 - `ROLLBACK_TAG`
 
@@ -204,6 +209,7 @@ Before real apply:
 1. Set AWS region and CIDR values in each environment `variables.tf` if needed.
 2. If you need SSH key pair access, set `key_name` variable in that environment.
 3. Restrict `ssh_ingress_cidr` from `0.0.0.0/0` to your IP for safety.
+4. Restrict `monitoring_ingress_cidr` to trusted IP ranges before exposing Grafana/Prometheus publicly.
 
 ---
 
@@ -242,6 +248,7 @@ Run Jenkins job with:
 - `DEPLOY_SCOPE=dev`
 - `DOCKERHUB_NAMESPACE=<your-dockerhub-username>`
 - `APPLY_INFRA=true`
+- `DEPLOY_MONITORING=true`
 - `ROLLBACK_DEPLOY=false`
 
 Outcome:
@@ -250,6 +257,11 @@ Outcome:
 3. Ansible provisions host
 4. Ansible deploys container
 5. Jenkins validates `http://<dev-host-ip>:3000/api/health`
+6. If `DEPLOY_MONITORING=true`, Jenkins deploys Prometheus, Grafana, Alertmanager, node-exporter, and blackbox-exporter
+7. Monitoring endpoints are available on:
+- `http://<dev-host-ip>:9090` (Prometheus)
+- `http://<dev-host-ip>:3001` (Grafana)
+- `http://<dev-host-ip>:9093` (Alertmanager)
 
 ### 9.3 Promote to Staging and Prod
 
@@ -331,8 +343,9 @@ docker logs post-disaster-alert-app --tail 200
 
 1. Move Terraform state to S3 + DynamoDB lock.
 2. Restrict app ingress with load balancer and HTTPS.
-3. Use AWS Secrets Manager instead of plain secret injection.
-4. Add smoke test script beyond health endpoint.
-5. Split Jenkins controller and build agents.
+3. Restrict monitoring ingress CIDR (`monitoring_ingress_cidr`) to office/VPN IPs.
+4. Use AWS Secrets Manager instead of plain secret injection.
+5. Add smoke test script beyond health endpoint.
+6. Split Jenkins controller and build agents.
 
 This gives you a complete implementation path using Jenkins, Terraform, Ansible, and Docker together, from setup to deployment and rollback.

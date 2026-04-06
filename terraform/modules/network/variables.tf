@@ -29,3 +29,9 @@ variable "ssh_ingress_cidr" {
   type        = string
   default     = "0.0.0.0/0"
 }
+
+variable "monitoring_ingress_cidr" {
+  description = "CIDR allowed to access Prometheus, Grafana, and Alertmanager"
+  type        = string
+  default     = "0.0.0.0/0"
+}

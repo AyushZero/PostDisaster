@@ -1,0 +1,185 @@
+---
+- name: Validate Slack webhook URL is configured
+  ansible.builtin.assert:
+    that:
+      - slack_webhook_url | length > 0
+    fail_msg: "SLACK_WEBHOOK_URL is required to deploy Alertmanager with Slack notifications."
+
+- name: Ensure monitoring working directory exists
+  ansible.builtin.file:
+    path: "{{ monitoring_workdir }}"
+    state: directory
+    mode: '0755'
+
+- name: Ensure monitoring config directory exists
+  ansible.builtin.file:
+    path: "{{ monitoring_config_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Ensure Grafana provisioning directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ monitoring_config_dir }}/grafana"
+    - "{{ monitoring_config_dir }}/grafana/provisioning"
+    - "{{ monitoring_config_dir }}/grafana/provisioning/datasources"
+    - "{{ monitoring_config_dir }}/grafana/provisioning/dashboards"
+    - "{{ monitoring_config_dir }}/grafana/dashboards"
+
+- name: Render Prometheus config
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: "{{ monitoring_config_dir }}/prometheus.yml"
+    mode: '0644'
+
+- name: Render Alertmanager config
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: "{{ monitoring_config_dir }}/alertmanager.yml"
+    mode: '0600'
+
+- name: Render blackbox exporter config
+  ansible.builtin.template:
+    src: blackbox.yml.j2
+    dest: "{{ monitoring_config_dir }}/blackbox.yml"
+    mode: '0644'
+
+- name: Render Prometheus alert rules
+  ansible.builtin.template:
+    src: alerts.yml.j2
+    dest: "{{ monitoring_config_dir }}/alerts.yml"
+    mode: '0644'
+
+- name: Render Grafana datasource provisioning
+  ansible.builtin.template:
+    src: grafana/provisioning/datasources/prometheus.yml.j2
+    dest: "{{ monitoring_config_dir }}/grafana/provisioning/datasources/prometheus.yml"
+    mode: '0644'
+
+- name: Render Grafana dashboard provider
+  ansible.builtin.template:
+    src: grafana/provisioning/dashboards/dashboard-provider.yml.j2
+    dest: "{{ monitoring_config_dir }}/grafana/provisioning/dashboards/dashboard-provider.yml"
+    mode: '0644'
+
+- name: Render Grafana dashboard JSON
+  ansible.builtin.template:
+    src: grafana/dashboards/overview.json.j2
+    dest: "{{ monitoring_config_dir }}/grafana/dashboards/overview.json"
+    mode: '0644'
+
+- name: Ensure monitoring docker network exists
+  ansible.builtin.command:
+    cmd: "docker network create {{ monitoring_network }}"
+  register: create_network
+  changed_when: create_network.rc == 0
+  failed_when: false
+
+- name: Stop existing monitoring containers if present
+  ansible.builtin.command:
+    cmd: "docker rm -f {{ item }}"
+  loop:
+    - "{{ prometheus_container_name }}"
+    - "{{ grafana_container_name }}"
+    - "{{ alertmanager_container_name }}"
+    - "{{ node_exporter_container_name }}"
+    - "{{ blackbox_container_name }}"
+  register: remove_monitoring_containers
+  changed_when: remove_monitoring_containers.rc == 0
+  failed_when: false
+
+- name: Start node exporter
+  ansible.builtin.command:
+    cmd: >-
+      docker run -d
+      --name {{ node_exporter_container_name }}
+      --restart unless-stopped
+      --network {{ monitoring_network }}
+      --pid host
+      -v /:/host:ro,rslave
+      {{ node_exporter_image }}
+      --path.rootfs=/host
+
+- name: Start Alertmanager
+  ansible.builtin.command:
+    cmd: >-
+      docker run -d
+      --name {{ alertmanager_container_name }}
+      --restart unless-stopped
+      --network {{ monitoring_network }}
+      -p {{ alertmanager_host_port }}:9093
+      -v {{ monitoring_config_dir }}/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      {{ alertmanager_image }}
+      --config.file=/etc/alertmanager/alertmanager.yml
+
+- name: Start blackbox exporter
+  ansible.builtin.command:
+    cmd: >-
+      docker run -d
+      --name {{ blackbox_container_name }}
+      --restart unless-stopped
+      --network {{ monitoring_network }}
+      -p 9115:9115
+      -v {{ monitoring_config_dir }}/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+      {{ blackbox_image }}
+      --config.file=/etc/blackbox_exporter/config.yml
+
+- name: Start Prometheus
+  ansible.builtin.command:
+    cmd: >-
+      docker run -d
+      --name {{ prometheus_container_name }}
+      --restart unless-stopped
+      --network {{ monitoring_network }}
+      -p {{ prometheus_host_port }}:9090
+      -v {{ monitoring_config_dir }}/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      -v {{ monitoring_config_dir }}/alerts.yml:/etc/prometheus/alerts.yml:ro
+      {{ prometheus_image }}
+      --config.file=/etc/prometheus/prometheus.yml
+
+- name: Start Grafana
+  ansible.builtin.command:
+    cmd: >-
+      docker run -d
+      --name {{ grafana_container_name }}
+      --restart unless-stopped
+      --network {{ monitoring_network }}
+      -p {{ grafana_host_port }}:3000
+      -e GF_SECURITY_ADMIN_USER={{ grafana_admin_user }}
+      -e GF_SECURITY_ADMIN_PASSWORD={{ grafana_admin_password }}
+      -v {{ monitoring_config_dir }}/grafana/provisioning:/etc/grafana/provisioning:ro
+      -v {{ monitoring_config_dir }}/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      {{ grafana_image }}
+
+- name: Wait for Alertmanager health endpoint
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ alertmanager_host_port }}/-/healthy"
+    method: GET
+    status_code: 200
+  register: alertmanager_health
+  retries: 12
+  delay: 5
+  until: alertmanager_health.status == 200
+
+- name: Wait for Prometheus ready endpoint
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ prometheus_host_port }}/-/ready"
+    method: GET
+    status_code: 200
+  register: prometheus_health
+  retries: 12
+  delay: 5
+  until: prometheus_health.status == 200
+
+- name: Wait for Grafana health endpoint
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ grafana_host_port }}/api/health"
+    method: GET
+    status_code: 200
+  register: grafana_health
+  retries: 12
+  delay: 5
+  until: grafana_health.status == 200
