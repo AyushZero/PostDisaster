@@ -155,14 +155,27 @@
       {{ grafana_image }}
 
 - name: Wait for Alertmanager health endpoint
-  ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ alertmanager_host_port }}/-/healthy"
-    method: GET
-    status_code: 200
-  register: alertmanager_health
-  retries: 12
-  delay: 5
-  until: alertmanager_health.status == 200
+  block:
+    - name: Poll Alertmanager health endpoint
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ alertmanager_host_port }}/-/healthy"
+        method: GET
+        status_code: 200
+      register: alertmanager_health
+      retries: 24
+      delay: 5
+      until: alertmanager_health.status == 200
+  rescue:
+    - name: Print Alertmanager logs when health check fails
+      ansible.builtin.command:
+        cmd: "docker logs --tail 120 {{ alertmanager_container_name }}"
+      register: alertmanager_logs
+      changed_when: false
+      failed_when: false
+
+    - name: Fail monitoring deployment with Alertmanager logs
+      ansible.builtin.fail:
+        msg: "Alertmanager health check failed. Logs: {{ alertmanager_logs.stdout | default('no logs available') }}"
 
 - name: Wait for Prometheus ready endpoint
   ansible.builtin.uri:

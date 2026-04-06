@@ -3,9 +3,9 @@ global:
 
 route:
   receiver: slack-notifications
-  group_wait: 10s
-  group_interval: 30s
-  repeat_interval: 2h
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
 
 receivers:
   - name: slack-notifications
@@ -13,5 +13,5 @@ receivers:
       - api_url: '{{ slack_webhook_url }}'
         send_resolved: true
         channel: '#alerts'
-        title: '[{{ environment_name | upper }}] {{ "{{" }} .CommonLabels.alertname {{ "}}" }}'
-        text: '{{ "{{" }} range .Alerts {{ "}}" }}{{ "{{" }} .Annotations.summary {{ "}}" }}\n{{ "{{" }} .Annotations.description {{ "}}" }}{{ "{{" }} end {{ "}}" }}'
+        title: '[{{ environment_name | upper }}] Alertmanager Notification'
+        text: '[{{ environment_name | upper }}] Alert fired. Check Alertmanager and Prometheus for details.'
