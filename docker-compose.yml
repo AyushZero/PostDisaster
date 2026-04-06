@@ -23,6 +23,7 @@ services:
       - "--config.file=/etc/prometheus/prometheus.yml"
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
       - prometheus_data:/prometheus
     networks:
       - app-network
@@ -64,6 +65,37 @@ services:
     networks:
       - app-network
 
+  alertmanager:
+    image: prom/alertmanager:latest
+    profiles: ["monitoring"]
+    ports:
+      - "9093:9093"
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./monitoring/alertmanager/templates:/etc/alertmanager/templates:ro
+      - alertmanager_data:/alertmanager
+    depends_on:
+      - prometheus
+    networks:
+      - app-network
+
+  sonarqube:
+    image: sonarqube:lts-community
+    profiles: ["security"]
+    ports:
+      - "9000:9000"
+    environment:
+      - SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    networks:
+      - app-network
+
   # Local PostgreSQL for development (optional - you can use Supabase directly)
   db:
     image: postgres:15-alpine
@@ -87,3 +119,7 @@ volumes:
   postgres_data:
   prometheus_data:
   grafana_data:
+  alertmanager_data:
+  sonarqube_data:
+  sonarqube_extensions:
+  sonarqube_logs:

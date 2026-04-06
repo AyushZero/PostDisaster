@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: post-disaster-alert
+  namespace: post-disaster-alert
+  labels:
+    app.kubernetes.io/name: post-disaster-alert
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: post-disaster-alert
+    slot: blue   # <-- Blue-Green: switch to "green" during deployment cutover

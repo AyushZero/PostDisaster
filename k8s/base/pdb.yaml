@@ -1,0 +1,12 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: post-disaster-alert
+  namespace: post-disaster-alert
+  labels:
+    app.kubernetes.io/name: post-disaster-alert
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: post-disaster-alert

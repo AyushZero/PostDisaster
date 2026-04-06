@@ -1,12 +1,18 @@
 pipeline {
     agent any
 
+    triggers {
+        githubPush()
+    }
+
     parameters {
         choice(name: 'DEPLOY_SCOPE', choices: ['dev', 'staging', 'prod', 'all'], description: 'Where to deploy after CI passes')
         booleanParam(name: 'APPLY_INFRA', defaultValue: false, description: 'Run terraform apply (false = plan only)')
         booleanParam(name: 'STRICT_LINT', defaultValue: false, description: 'Fail the build if lint reports errors')
         booleanParam(name: 'ROLLBACK_DEPLOY', defaultValue: false, description: 'Deploy rollback tag instead of current build')
         string(name: 'ROLLBACK_TAG', defaultValue: '', description: 'Required when ROLLBACK_DEPLOY is true')
+        booleanParam(name: 'RUN_ZAP_SCAN', defaultValue: true, description: 'Run OWASP ZAP DAST scan after deploy')
+        booleanParam(name: 'DEPLOY_K8S', defaultValue: true, description: 'Run Kubernetes blue-green deployment')
     }
 
     environment {
@@ -17,6 +23,9 @@ pipeline {
     }
 
     stages {
+        // ---------------------------------------------------------------
+        // CI Stages — Automatic on every push
+        // ---------------------------------------------------------------
         stage('Checkout') {
             steps {
                 checkout scm
@@ -50,6 +59,34 @@ pipeline {
             }
         }
 
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    def scannerHome = tool name: 'SonarQubeScanner', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
+                    withSonarQubeEnv('SonarQube') {
+                        sh """
+                            ${scannerHome}/bin/sonar-scanner \
+                                -Dsonar.projectKey=${APP_NAME} \
+                                -Dsonar.sources=src \
+                                -Dsonar.host.url=\${SONAR_HOST_URL} \
+                                -Dsonar.login=\${SONAR_AUTH_TOKEN}
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('SonarQube Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: false
+                }
+            }
+        }
+
+        // ---------------------------------------------------------------
+        // Docker Build + Push
+        // ---------------------------------------------------------------
         stage('Build Docker Image') {
             steps {
                 script {
@@ -80,6 +117,9 @@ pipeline {
             }
         }
 
+        // ---------------------------------------------------------------
+        // CD — Terraform + Ansible (existing EC2 infra)
+        // ---------------------------------------------------------------
         stage('Terraform and Ansible Deploy') {
             steps {
                 script {
@@ -123,6 +163,68 @@ pipeline {
                 }
             }
         }
+
+        // ---------------------------------------------------------------
+        // CD — Kubernetes Blue-Green Deployment
+        // ---------------------------------------------------------------
+        stage('K8s Blue-Green Deploy') {
+            when {
+                expression { return params.DEPLOY_K8S }
+            }
+            steps {
+                script {
+                    def targets = []
+                    if (params.DEPLOY_SCOPE == 'all') {
+                        targets = ['dev', 'staging', 'prod']
+                    } else {
+                        targets = [params.DEPLOY_SCOPE]
+                    }
+
+                    for (target in targets) {
+                        if (target == 'prod') {
+                            input message: 'Approve K8s blue-green deployment to prod?', ok: 'Deploy prod'
+                        }
+
+                        withCredentials([file(credentialsId: 'KUBECONFIG', variable: 'KUBECONFIG')]) {
+                            if (params.ROLLBACK_DEPLOY) {
+                                echo "Rolling back K8s deployment for ${target}..."
+                                sh "bash scripts/jenkins/k8s_deploy.sh ${target} ${APP_IMAGE_TAG} rollback"
+                            } else {
+                                echo "Deploying to K8s (${target}) with blue-green strategy..."
+                                sh "bash scripts/jenkins/k8s_deploy.sh ${target} ${APP_IMAGE_TAG}"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ---------------------------------------------------------------
+        // Security — OWASP ZAP DAST
+        // ---------------------------------------------------------------
+        stage('OWASP ZAP DAST') {
+            when {
+                expression { return params.RUN_ZAP_SCAN }
+            }
+            steps {
+                script {
+                    def targets = []
+                    if (params.DEPLOY_SCOPE == 'all') {
+                        targets = ['dev', 'staging', 'prod']
+                    } else {
+                        targets = [params.DEPLOY_SCOPE]
+                    }
+
+                    for (target in targets) {
+                        def hostIp = sh(script: "cd terraform/environments/${target} && terraform output -raw app_public_ip", returnStdout: true).trim()
+                        def targetUrl = "http://${hostIp}:3000"
+                        echo "Running OWASP ZAP baseline scan against ${targetUrl} (${target})"
+
+                        sh "bash scripts/jenkins/owasp_zap.sh ${targetUrl} ${WORKSPACE} || true"
+                    }
+                }
+            }
+        }
     }
 
     post {
@@ -130,7 +232,7 @@ pipeline {
             echo "Build ${BUILD_NUMBER} completed. Image: ${DOCKER_IMAGE_REPOSITORY}:${APP_IMAGE_TAG}"
         }
         failure {
-            echo 'Pipeline failed. Check terraform/ansible/docker logs in this build.'
+            echo 'Pipeline failed. Check terraform/ansible/docker/sonar/zap/k8s logs in this build.'
         }
         always {
             script {
@@ -141,7 +243,7 @@ pipeline {
                 }
 
                 try {
-                    archiveArtifacts artifacts: 'terraform/environments/**/tfplan, ansible/inventories/**/hosts.generated.yml', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'terraform/environments/**/tfplan, ansible/inventories/**/hosts.generated.yml, zap-report.html', allowEmptyArchive: true
                 } catch (err) {
                     echo "Skipping artifact archive because workspace/agent context is unavailable: ${err}"
                 }

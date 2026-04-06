@@ -1,0 +1,94 @@
+groups:
+  - name: app_alerts
+    rules:
+      - alert: InstanceDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Instance {{ $labels.instance }} is down"
+          description: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 2 minutes."
+
+      - alert: AppHealthCheckFailing
+        expr: probe_success{job="http_probe"} == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Health check failing for {{ $labels.instance }}"
+          description: "Blackbox probe for {{ $labels.instance }} has been failing for more than 3 minutes."
+
+      - alert: HighCpuUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage on {{ $labels.instance }} has been above 80% for more than 5 minutes. Current value: {{ $value }}%"
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage on {{ $labels.instance }} has been above 85% for more than 5 minutes. Current value: {{ $value }}%"
+
+      - alert: HighDiskUsage
+        expr: (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|fuse.lxcfs"})) * 100 > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High disk usage on {{ $labels.instance }}"
+          description: "Disk usage on {{ $labels.instance }} mount {{ $labels.mountpoint }} is above 90%. Current value: {{ $value }}%"
+
+      - alert: HttpHighResponseTime
+        expr: probe_duration_seconds{job="http_probe"} > 5
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow HTTP response from {{ $labels.instance }}"
+          description: "HTTP response time for {{ $labels.instance }} has exceeded 5 seconds for more than 3 minutes."
+
+  - name: kubernetes_alerts
+    rules:
+      - alert: PodCrashLooping
+        expr: increase(kube_pod_container_status_restarts_total[15m]) > 3
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash-looping"
+          description: "Container {{ $labels.container }} in pod {{ $labels.pod }} has restarted {{ $value }} times in the last 15 minutes."
+
+      - alert: PodOOMKilled
+        expr: kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} was OOM killed"
+          description: "Container {{ $labels.container }} in pod {{ $labels.pod }} was terminated due to OOM (Out of Memory)."
+
+      - alert: DeploymentReplicasMismatch
+        expr: kube_deployment_spec_replicas != kube_deployment_status_ready_replicas
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Deployment {{ $labels.namespace }}/{{ $labels.deployment }} replicas mismatch"
+          description: "Deployment {{ $labels.deployment }} has {{ $value }} desired replicas but not all are ready for more than 10 minutes."
+
+      - alert: PodNotReady
+        expr: kube_pod_status_ready{condition="true"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is not ready"
+          description: "Pod {{ $labels.pod }} has been in a non-ready state for more than 5 minutes."

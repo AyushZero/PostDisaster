@@ -1,0 +1,15 @@
+{{ define "slack.title" -}}
+[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }}
+{{- end }}
+
+{{ define "slack.text" -}}
+{{ range .Alerts }}
+*Alert:* {{ .Labels.alertname }}
+*Severity:* {{ .Labels.severity }}
+*Instance:* {{ .Labels.instance }}
+*Description:* {{ .Annotations.description }}
+*Started:* {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}
+{{ if .EndsAt.IsZero }}{{ else }}*Resolved:* {{ .EndsAt.Format "2006-01-02 15:04:05 MST" }}{{ end }}
+---
+{{ end }}
+{{- end }}
