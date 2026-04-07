@@ -6,6 +6,11 @@ pipeline {
         booleanParam(name: 'APPLY_INFRA', defaultValue: false, description: 'Run terraform apply (false = plan only)')
         booleanParam(name: 'STRICT_LINT', defaultValue: false, description: 'Fail the build if lint reports errors')
         booleanParam(name: 'DEPLOY_MONITORING', defaultValue: true, description: 'Deploy Prometheus, Grafana, Alertmanager, and exporters')
+        booleanParam(name: 'ENABLE_SONAR', defaultValue: false, description: 'Run SonarQube SAST scan')
+        booleanParam(name: 'ENABLE_ZAP', defaultValue: false, description: 'Run OWASP ZAP baseline DAST scan against deployed app')
+        booleanParam(name: 'ZAP_FAIL_BUILD', defaultValue: false, description: 'Fail build when OWASP ZAP finds actionable issues')
+        string(name: 'SONAR_HOST_URL', defaultValue: '', description: 'SonarQube server URL (required when ENABLE_SONAR=true)')
+        string(name: 'ZAP_TARGET_URL', defaultValue: '', description: 'Optional override target URL for ZAP (default: deployed app URL)')
         booleanParam(name: 'ROLLBACK_DEPLOY', defaultValue: false, description: 'Deploy rollback tag instead of current build')
         string(name: 'ROLLBACK_TAG', defaultValue: '', description: 'Required when ROLLBACK_DEPLOY is true')
     }
@@ -51,6 +56,34 @@ pipeline {
             }
         }
 
+        stage('SonarQube SAST') {
+            when {
+                expression { return params.ENABLE_SONAR }
+            }
+            steps {
+                script {
+                    if (!params.SONAR_HOST_URL?.trim()) {
+                        error('SONAR_HOST_URL is required when ENABLE_SONAR=true')
+                    }
+                }
+
+                withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
+                    sh '''
+                        docker run --rm \
+                          -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
+                          -e SONAR_TOKEN="${SONAR_TOKEN}" \
+                          -v "$PWD:/usr/src" \
+                          sonarsource/sonar-scanner-cli:latest \
+                          sonar-scanner \
+                            -Dsonar.projectKey=${APP_NAME} \
+                            -Dsonar.projectName=${APP_NAME} \
+                            -Dsonar.sources=src \
+                            -Dsonar.exclusions=**/node_modules/**,**/.next/**
+                    '''
+                }
+            }
+        }
+
         stage('Build Docker Image') {
             steps {
                 script {
@@ -84,6 +117,8 @@ pipeline {
         stage('Terraform and Ansible Deploy') {
             steps {
                 script {
+                    sh 'mkdir -p security-reports'
+
                     def targets = []
                     if (params.DEPLOY_SCOPE == 'all') {
                         targets = ['dev', 'staging', 'prod']
@@ -132,6 +167,30 @@ pipeline {
 
                         def hostIp = sh(script: "cd terraform/environments/${target} && terraform output -raw app_public_ip", returnStdout: true).trim()
                         sh "curl -fsS http://${hostIp}:3000/api/health"
+
+                        if (params.ENABLE_ZAP) {
+                            def zapTarget = params.ZAP_TARGET_URL?.trim() ? params.ZAP_TARGET_URL.trim() : "http://${hostIp}:3000"
+                            def zapStatus = sh(
+                                script: """
+                                    docker run --rm \
+                                      -v \"$PWD/security-reports:/zap/wrk:rw\" \
+                                      ghcr.io/zaproxy/zaproxy:stable \
+                                      zap-baseline.py \
+                                        -t \"${zapTarget}\" \
+                                        -J \"zap-${target}.json\" \
+                                        -r \"zap-${target}.html\"
+                                """,
+                                returnStatus: true
+                            )
+
+                            if (zapStatus != 0) {
+                                if (params.ZAP_FAIL_BUILD) {
+                                    error("OWASP ZAP reported issues for ${target}; failing build because ZAP_FAIL_BUILD=true")
+                                } else {
+                                    echo "OWASP ZAP reported issues for ${target}; continuing because ZAP_FAIL_BUILD=false"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -162,7 +221,7 @@ pipeline {
                 }
 
                 try {
-                    archiveArtifacts artifacts: 'terraform/environments/**/tfplan, ansible/inventories/**/hosts.generated.yml', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'terraform/environments/**/tfplan, ansible/inventories/**/hosts.generated.yml, security-reports/**', allowEmptyArchive: true
                 } catch (err) {
                     echo "Skipping artifact archive because workspace/agent context is unavailable: ${err}"
                 }

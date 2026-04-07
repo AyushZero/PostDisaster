@@ -137,6 +137,7 @@ Install these if not already present:
 - Pipeline
 - Credentials Binding
 - Docker Pipeline
+- SonarQube Scanner (optional, only if `ENABLE_SONAR=true`)
 
 ### 4.3 Add Jenkins Credentials
 
@@ -156,7 +157,11 @@ Go to Manage Jenkins -> Credentials -> Global and add:
 - value: Slack incoming webhook URL used by Alertmanager
 - required only when `DEPLOY_MONITORING=true`
 
-5. AWS credentials
+5. `SONAR_TOKEN` (Secret text)
+- value: SonarQube user token with project analysis permission
+- required only when `ENABLE_SONAR=true`
+
+6. AWS credentials
 - Use one of these approaches:
 - recommended: attach IAM role to Jenkins host
 - alternative: add AWS access key credentials and export them in job environment
@@ -176,6 +181,11 @@ The pipeline already expects these parameters:
 - `DOCKERHUB_NAMESPACE`
 - `APPLY_INFRA`: true/false
 - `DEPLOY_MONITORING`: true/false
+- `ENABLE_SONAR`: true/false
+- `SONAR_HOST_URL`: SonarQube base URL (required when `ENABLE_SONAR=true`)
+- `ENABLE_ZAP`: true/false
+- `ZAP_TARGET_URL`: optional explicit target URL for ZAP scan
+- `ZAP_FAIL_BUILD`: fail build on ZAP findings when true
 - `ROLLBACK_DEPLOY`: true/false
 - `ROLLBACK_TAG`
 
