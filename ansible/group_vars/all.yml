@@ -36,3 +36,11 @@ node_exporter_image: prom/node-exporter:latest
 
 blackbox_container_name: post-disaster-alert-blackbox-exporter
 blackbox_image: prom/blackbox-exporter:latest
+
+k8s_namespace: post-disaster-alert
+k8s_service_name: post-disaster-alert
+k8s_secret_name: post-disaster-alert-env
+k8s_deploy_slot: green
+k8s_switch_traffic: true
+k8s_default_live_slot: blue
+k8s_node_port: 30080

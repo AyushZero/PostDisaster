@@ -4,10 +4,11 @@ set -euo pipefail
 ENVIRONMENT="${1:-}"
 IMAGE_TAG="${2:-}"
 ACTION="${3:-deploy}"
-ROLLBACK_TAG="${4:-}"
+ARG_ONE="${4:-}"
+ARG_TWO="${5:-}"
 
 if [[ -z "${ENVIRONMENT}" || -z "${IMAGE_TAG}" ]]; then
-  echo "Usage: $0 <dev|staging|prod> <image_tag> <provision|deploy|rollback|monitoring> [rollback_tag]"
+  echo "Usage: $0 <dev|staging|prod> <image_tag> <provision|deploy|rollback|monitoring|k8s> [arg1] [arg2]"
   exit 1
 fi
 
@@ -52,13 +53,22 @@ fi
 if [[ "${ACTION}" == "provision" ]]; then
   ansible-playbook -i "${INVENTORY_FILE}" ansible/playbooks/provision.yml
 elif [[ "${ACTION}" == "rollback" ]]; then
+  ROLLBACK_TAG="${ARG_ONE}"
   if [[ -z "${ROLLBACK_TAG}" ]]; then
     echo "rollback tag is required when ACTION=rollback"
     exit 1
   fi
   ansible-playbook -i "${INVENTORY_FILE}" ansible/playbooks/rollback.yml -e "rollback_image_tag=${ROLLBACK_TAG}"
 elif [[ "${ACTION}" == "monitoring" ]]; then
-  ansible-playbook -i "${INVENTORY_FILE}" ansible/playbooks/deploy_monitoring.yml
+  MONITORING_EXTRA_VARS=()
+  if [[ -n "${APP_HOST_PORT_OVERRIDE:-}" ]]; then
+    MONITORING_EXTRA_VARS+=("-e" "app_host_port=${APP_HOST_PORT_OVERRIDE}")
+  fi
+  ansible-playbook -i "${INVENTORY_FILE}" ansible/playbooks/deploy_monitoring.yml "${MONITORING_EXTRA_VARS[@]}"
+elif [[ "${ACTION}" == "k8s" ]]; then
+  K8S_DEPLOY_SLOT="${ARG_ONE:-green}"
+  K8S_SWITCH_TRAFFIC="${ARG_TWO:-true}"
+  ansible-playbook -i "${INVENTORY_FILE}" ansible/playbooks/deploy_k8s_blue_green.yml -e "k8s_deploy_slot=${K8S_DEPLOY_SLOT}" -e "k8s_switch_traffic=${K8S_SWITCH_TRAFFIC}"
 else
   ansible-playbook -i "${INVENTORY_FILE}" ansible/playbooks/deploy.yml
 fi

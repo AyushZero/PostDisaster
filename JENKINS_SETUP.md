@@ -181,6 +181,9 @@ The pipeline already expects these parameters:
 - `DOCKERHUB_NAMESPACE`
 - `APPLY_INFRA`: true/false
 - `DEPLOY_MONITORING`: true/false
+- `DEPLOY_K8S`: true/false (deploy app to Kubernetes on target host)
+- `K8S_DEPLOY_SLOT`: `blue|green` slot to deploy
+- `K8S_SWITCH_TRAFFIC`: true/false (switch live service to deployed slot)
 - `ENABLE_SONAR`: true/false
 - `SONAR_HOST_URL`: SonarQube base URL (required when `ENABLE_SONAR=true`)
 - `ENABLE_ZAP`: true/false
@@ -272,6 +275,22 @@ Outcome:
 - `http://<dev-host-ip>:9090` (Prometheus)
 - `http://<dev-host-ip>:3001` (Grafana)
 - `http://<dev-host-ip>:9093` (Alertmanager)
+
+### 9.4 Kubernetes Blue-Green Deployment (Optional)
+
+Run Jenkins job with:
+- `DEPLOY_SCOPE=dev`
+- `APPLY_INFRA=true` (first run to ensure security group includes NodePort 30080)
+- `DEPLOY_K8S=true`
+- `K8S_DEPLOY_SLOT=green` (or `blue`)
+- `K8S_SWITCH_TRAFFIC=true`
+
+Behavior:
+1. Jenkins still builds and pushes Docker image.
+2. Ansible installs/ensures k3s on the app host.
+3. Deploys selected slot (`blue` or `green`) as a Kubernetes Deployment.
+4. Service `post-disaster-alert` is switched to selected slot when `K8S_SWITCH_TRAFFIC=true`.
+5. Jenkins verifies health on `http://<dev-host-ip>:30080/api/health`.
 
 ### 9.3 Promote to Staging and Prod
 

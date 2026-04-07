@@ -6,6 +6,9 @@ pipeline {
         booleanParam(name: 'APPLY_INFRA', defaultValue: false, description: 'Run terraform apply (false = plan only)')
         booleanParam(name: 'STRICT_LINT', defaultValue: false, description: 'Fail the build if lint reports errors')
         booleanParam(name: 'DEPLOY_MONITORING', defaultValue: true, description: 'Deploy Prometheus, Grafana, Alertmanager, and exporters')
+        booleanParam(name: 'DEPLOY_K8S', defaultValue: false, description: 'Deploy app to Kubernetes using blue-green strategy')
+        choice(name: 'K8S_DEPLOY_SLOT', choices: ['green', 'blue'], description: 'Kubernetes slot to deploy before optional traffic switch')
+        booleanParam(name: 'K8S_SWITCH_TRAFFIC', defaultValue: true, description: 'Switch Kubernetes live traffic to K8S_DEPLOY_SLOT after verification')
         booleanParam(name: 'ENABLE_SONAR', defaultValue: false, description: 'Run SonarQube SAST scan')
         booleanParam(name: 'ENABLE_ZAP', defaultValue: false, description: 'Run OWASP ZAP baseline DAST scan against deployed app')
         booleanParam(name: 'ZAP_FAIL_BUILD', defaultValue: false, description: 'Fail build when OWASP ZAP finds actionable issues')
@@ -151,7 +154,11 @@ pipeline {
                                 }
                                 sh "bash scripts/jenkins/ansible_deploy.sh ${target} ${APP_IMAGE_TAG} rollback ${params.ROLLBACK_TAG}"
                             } else {
-                                sh "bash scripts/jenkins/ansible_deploy.sh ${target} ${APP_IMAGE_TAG} deploy"
+                                if (params.DEPLOY_K8S) {
+                                    sh "bash scripts/jenkins/ansible_deploy.sh ${target} ${APP_IMAGE_TAG} k8s ${params.K8S_DEPLOY_SLOT} ${params.K8S_SWITCH_TRAFFIC}"
+                                } else {
+                                    sh "bash scripts/jenkins/ansible_deploy.sh ${target} ${APP_IMAGE_TAG} deploy"
+                                }
                             }
                         }
 
@@ -161,15 +168,22 @@ pipeline {
                                 string(credentialsId: 'SLACK_ALERT_WEBHOOK', variable: 'SLACK_WEBHOOK_URL')
                             ]) {
                                 env.DEPLOY_ENVIRONMENT = target
-                                sh "bash scripts/jenkins/ansible_deploy.sh ${target} ${APP_IMAGE_TAG} monitoring"
+                                if (params.DEPLOY_K8S) {
+                                    withEnv(['APP_HOST_PORT_OVERRIDE=30080']) {
+                                        sh "bash scripts/jenkins/ansible_deploy.sh ${target} ${APP_IMAGE_TAG} monitoring"
+                                    }
+                                } else {
+                                    sh "bash scripts/jenkins/ansible_deploy.sh ${target} ${APP_IMAGE_TAG} monitoring"
+                                }
                             }
                         }
 
                         def hostIp = sh(script: "cd terraform/environments/${target} && terraform output -raw app_public_ip", returnStdout: true).trim()
-                        sh "curl -fsS http://${hostIp}:3000/api/health"
+                        def healthPort = params.DEPLOY_K8S ? '30080' : '3000'
+                        sh "curl -fsS http://${hostIp}:${healthPort}/api/health"
 
                         if (params.ENABLE_ZAP) {
-                            def zapTarget = params.ZAP_TARGET_URL?.trim() ? params.ZAP_TARGET_URL.trim() : "http://${hostIp}:3000"
+                            def zapTarget = params.ZAP_TARGET_URL?.trim() ? params.ZAP_TARGET_URL.trim() : "http://${hostIp}:${healthPort}"
                             def zapStatus = sh(
                                 script: """
                                     docker run --rm \

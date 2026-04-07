@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ app_name }}-{{ k8s_deploy_slot }}
+  namespace: {{ k8s_namespace }}
+  labels:
+    app: {{ app_name }}
+    slot: {{ k8s_deploy_slot }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ app_name }}
+      slot: {{ k8s_deploy_slot }}
+  template:
+    metadata:
+      labels:
+        app: {{ app_name }}
+        slot: {{ k8s_deploy_slot }}
+    spec:
+      containers:
+        - name: {{ app_name }}
+          image: {{ app_image_repository }}:{{ app_image_tag }}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: {{ app_port }}
+          envFrom:
+            - secretRef:
+                name: {{ k8s_secret_name }}
+          env:
+            - name: PORT
+              value: "{{ app_port }}"
+            - name: HOSTNAME
+              value: "0.0.0.0"
+          readinessProbe:
+            httpGet:
+              path: {{ app_health_path }}
+              port: {{ app_port }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: {{ app_health_path }}
+              port: {{ app_port }}
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            failureThreshold: 6

@@ -97,6 +97,14 @@ resource "aws_security_group" "app" {
     cidr_blocks = [var.monitoring_ingress_cidr]
   }
 
+  ingress {
+    description = "Kubernetes app NodePort"
+    from_port   = 30080
+    to_port     = 30080
+    protocol    = "tcp"
+    cidr_blocks = [var.k8s_app_ingress_cidr]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0

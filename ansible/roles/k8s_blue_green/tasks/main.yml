@@ -1,0 +1,125 @@
+---
+- name: Validate Kubernetes blue-green deploy inputs
+  ansible.builtin.assert:
+    that:
+      - k8s_deploy_slot in ['blue', 'green']
+      - app_image_repository | length > 0
+      - app_image_tag | length > 0
+      - lookup('env', 'NEXT_PUBLIC_SUPABASE_URL') | length > 0
+      - lookup('env', 'NEXT_PUBLIC_SUPABASE_ANON_KEY') | length > 0
+    fail_msg: "Missing required inputs for Kubernetes blue-green deploy."
+
+- name: Check whether k3s binary is already installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/k3s
+  register: k3s_binary
+
+- name: Install k3s when missing
+  ansible.builtin.shell: |
+    set -e
+    curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--write-kubeconfig-mode 644 --disable traefik" sh -
+  args:
+    executable: /bin/bash
+  when: not k3s_binary.stat.exists
+
+- name: Ensure k3s service is enabled and running
+  ansible.builtin.service:
+    name: k3s
+    state: started
+    enabled: true
+
+- name: Wait for Kubernetes API to become responsive
+  ansible.builtin.command:
+    cmd: kubectl get nodes
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  register: k8s_nodes
+  retries: 18
+  delay: 5
+  until: k8s_nodes.rc == 0
+  changed_when: false
+
+- name: Ensure namespace exists
+  ansible.builtin.shell: |
+    kubectl create namespace {{ k8s_namespace }} --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Create or update app environment secret
+  ansible.builtin.shell: |
+    kubectl -n {{ k8s_namespace }} create secret generic {{ k8s_secret_name }} \
+      --from-literal=NEXT_PUBLIC_SUPABASE_URL="{{ lookup('env', 'NEXT_PUBLIC_SUPABASE_URL') }}" \
+      --from-literal=NEXT_PUBLIC_SUPABASE_ANON_KEY="{{ lookup('env', 'NEXT_PUBLIC_SUPABASE_ANON_KEY') }}" \
+      --from-literal=NEXT_PUBLIC_APP_URL="http://{{ ansible_host }}:{{ k8s_node_port }}" \
+      --from-literal=NODE_ENV=production \
+      --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Render Kubernetes service manifest
+  ansible.builtin.template:
+    src: service.yml.j2
+    dest: /tmp/post-disaster-alert-service.yml
+    mode: '0644'
+
+- name: Apply Kubernetes service manifest
+  ansible.builtin.command:
+    cmd: kubectl apply -f /tmp/post-disaster-alert-service.yml
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Render Kubernetes deployment manifest for target slot
+  ansible.builtin.template:
+    src: deployment.yml.j2
+    dest: "/tmp/post-disaster-alert-{{ k8s_deploy_slot }}.yml"
+    mode: '0644'
+
+- name: Apply target slot deployment manifest
+  ansible.builtin.command:
+    cmd: "kubectl apply -f /tmp/post-disaster-alert-{{ k8s_deploy_slot }}.yml"
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Wait for target slot rollout
+  ansible.builtin.command:
+    cmd: "kubectl -n {{ k8s_namespace }} rollout status deployment/{{ app_name }}-{{ k8s_deploy_slot }} --timeout=180s"
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Switch service traffic to target slot
+  ansible.builtin.shell: >-
+    kubectl -n {{ k8s_namespace }} patch service {{ k8s_service_name }}
+    -p '{"spec":{"selector":{"app":"{{ app_name }}","slot":"{{ k8s_deploy_slot }}"}}}'
+  args:
+    executable: /bin/bash
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  when: k8s_switch_traffic | bool
+  changed_when: true
+
+- name: Wait for Kubernetes app health endpoint on NodePort
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ k8s_node_port }}{{ app_health_path }}"
+    method: GET
+    status_code: 200
+  register: k8s_health
+  retries: 24
+  delay: 5
+  until: k8s_health.status == 200
+
+- name: Print current live slot selector
+  ansible.builtin.command:
+    cmd: "kubectl -n {{ k8s_namespace }} get service {{ k8s_service_name }} -o jsonpath={.spec.selector.slot}"
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  register: k8s_live_slot
+  changed_when: false
+
+- name: Show active blue-green slot
+  ansible.builtin.debug:
+    msg: "Kubernetes blue-green live slot is now: {{ k8s_live_slot.stdout }}"

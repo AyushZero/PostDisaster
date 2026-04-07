@@ -47,3 +47,8 @@ variable "monitoring_ingress_cidr" {
   type    = string
   default = "0.0.0.0/0"
 }
+
+variable "k8s_app_ingress_cidr" {
+  type    = string
+  default = "0.0.0.0/0"
+}

@@ -26,6 +26,7 @@ module "network" {
   app_ingress_cidr   = var.app_ingress_cidr
   ssh_ingress_cidr   = var.ssh_ingress_cidr
   monitoring_ingress_cidr = var.monitoring_ingress_cidr
+  k8s_app_ingress_cidr = var.k8s_app_ingress_cidr
 }
 
 module "compute" {
