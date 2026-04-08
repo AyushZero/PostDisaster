@@ -39,6 +39,29 @@ if [[ ! -d "${TF_DIR}" ]]; then
   exit 1
 fi
 
+PERSIST_ROOT="${JENKINS_HOME:-/var/lib/jenkins}/terraform-state"
+PERSIST_DIR="${PERSIST_ROOT}/${ENVIRONMENT}"
+
+mkdir -p "${PERSIST_DIR}"
+
+restore_state_file() {
+  local name="$1"
+  if [[ -f "${PERSIST_DIR}/${name}" && ! -f "${TF_DIR}/${name}" ]]; then
+    cp "${PERSIST_DIR}/${name}" "${TF_DIR}/${name}"
+  fi
+}
+
+persist_state_file() {
+  local name="$1"
+  if [[ -f "${TF_DIR}/${name}" ]]; then
+    cp "${TF_DIR}/${name}" "${PERSIST_DIR}/${name}"
+  fi
+}
+
+restore_state_file "terraform.tfstate"
+restore_state_file "terraform.tfstate.backup"
+restore_state_file ".terraform.lock.hcl"
+
 pushd "${TF_DIR}" >/dev/null
 
 terraform init -input=false -no-color
@@ -58,6 +81,10 @@ set -e
 
 APP_IP="$(printf '%s' "${APP_IP_RAW}" | strip_ansi | trim_whitespace)"
 SSH_USER="$(printf '%s' "${SSH_USER_RAW}" | strip_ansi | trim_whitespace)"
+
+persist_state_file "terraform.tfstate"
+persist_state_file "terraform.tfstate.backup"
+persist_state_file ".terraform.lock.hcl"
 
 popd >/dev/null
 
