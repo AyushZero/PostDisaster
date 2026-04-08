@@ -163,6 +163,7 @@
       {{ grafana_image }}
 
 - name: Wait for Alertmanager health endpoint
+  become: false
   block:
     - name: Poll Alertmanager health endpoint
       ansible.builtin.uri:
@@ -243,6 +244,7 @@
           {{ alertmanager_config_content.content | default('Could not read config') | b64decode }}
 
 - name: Wait for Prometheus ready endpoint
+  become: false
   ansible.builtin.uri:
     url: "http://127.0.0.1:{{ prometheus_host_port }}/-/ready"
     method: GET
@@ -253,6 +255,7 @@
   until: prometheus_health.status == 200
 
 - name: Wait for Grafana health endpoint
+  become: false
   ansible.builtin.uri:
     url: "http://127.0.0.1:{{ grafana_host_port }}/api/health"
     method: GET
