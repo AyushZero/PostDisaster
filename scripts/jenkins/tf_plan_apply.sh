@@ -10,6 +10,43 @@ trim_whitespace() {
   sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//'
 }
 
+discover_existing_instance() {
+  local env_name="$1"
+  local region_hint="${AWS_REGION:-}"
+  local region_default="eu-north-1"
+  local region="${region_hint:-${region_default}}"
+
+  if ! command -v aws >/dev/null 2>&1; then
+    return 1
+  fi
+
+  local instance_query="Reservations[].Instances[?State.Name=='running'].[PublicIpAddress,Tags[?Key=='SSHUser']|[0].Value]"
+  local instance_data
+
+  instance_data="$(aws ec2 describe-instances \
+    --region "${region}" \
+    --filters "Name=tag:Name,Values=post-disaster-alert-${env_name}-app" \
+    --query "${instance_query}" \
+    --output text 2>/dev/null | head -n 1 | trim_whitespace || true)"
+
+  if [[ -z "${instance_data}" || "${instance_data}" == "None" ]]; then
+    return 1
+  fi
+
+  DISCOVERED_APP_IP="$(printf '%s' "${instance_data}" | awk '{print $1}' | trim_whitespace)"
+  DISCOVERED_SSH_USER="$(printf '%s' "${instance_data}" | awk '{print $2}' | trim_whitespace)"
+
+  if [[ -z "${DISCOVERED_SSH_USER}" || "${DISCOVERED_SSH_USER}" == "None" ]]; then
+    DISCOVERED_SSH_USER="ec2-user"
+  fi
+
+  if is_valid_ipv4 "${DISCOVERED_APP_IP}"; then
+    return 0
+  fi
+
+  return 1
+}
+
 is_valid_ipv4() {
   local ip="${1:-}"
   [[ "${ip}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
@@ -69,7 +106,20 @@ terraform validate
 terraform plan -out=tfplan -input=false -no-color
 
 if [[ "${APPLY_MODE}" == "true" ]]; then
-  terraform apply -input=false -auto-approve -no-color tfplan
+  set +e
+  APPLY_OUTPUT="$(terraform apply -input=false -auto-approve -no-color tfplan 2>&1)"
+  APPLY_RC=$?
+  set -e
+
+  printf '%s\n' "${APPLY_OUTPUT}"
+
+  if [[ ${APPLY_RC} -ne 0 ]]; then
+    if printf '%s' "${APPLY_OUTPUT}" | grep -q "VpcLimitExceeded"; then
+      echo "Terraform apply hit AWS VPC quota (VpcLimitExceeded). Will try fallback to existing instance discovery."
+    else
+      exit ${APPLY_RC}
+    fi
+  fi
 fi
 
 set +e
@@ -93,6 +143,16 @@ GENERATED_INVENTORY="ansible/inventories/${ENVIRONMENT}/hosts.generated.yml"
 if [[ ${APP_IP_RC} -eq 0 && ${SSH_USER_RC} -eq 0 ]]; then
   if ! is_valid_ipv4 "${APP_IP}"; then
     APP_IP=""
+  fi
+fi
+
+if [[ -z "${APP_IP}" || -z "${SSH_USER}" ]]; then
+  if discover_existing_instance "${ENVIRONMENT}"; then
+    APP_IP="${DISCOVERED_APP_IP}"
+    SSH_USER="${DISCOVERED_SSH_USER}"
+    APP_IP_RC=0
+    SSH_USER_RC=0
+    echo "Using existing running instance discovered from AWS tags for ${ENVIRONMENT}: ${APP_IP}"
   fi
 fi
 
