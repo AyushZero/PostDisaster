@@ -32,7 +32,6 @@ pipeline {
                 sh 'chmod +x scripts/jenkins/*.sh'
             }
         }
-
         stage('Validate Toolchain') {
             steps {
                 sh 'bash scripts/jenkins/validate_stack.sh'
@@ -213,7 +212,9 @@ pipeline {
                             def zapTarget = params.ZAP_TARGET_URL?.trim() ? params.ZAP_TARGET_URL.trim() : "http://${hostIp}:${healthPort}"
                             def zapStatus = sh(
                                 script: """
+                                                                        install -d -m 0777 "$PWD/security-reports"
                                     docker run --rm \
+                                                                            --user 0:0 \
                                       -v \"$PWD/security-reports:/zap/wrk:rw\" \
                                       ghcr.io/zaproxy/zaproxy:stable \
                                       zap-baseline.py \
