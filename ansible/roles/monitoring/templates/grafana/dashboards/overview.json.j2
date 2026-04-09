@@ -1,38 +1,134 @@
 {
   "uid": "post-disaster-overview",
-  "title": "Post Disaster Monitoring Overview",
-  "tags": ["monitoring", "post-disaster-alert"],
+  "title": "Post Disaster K8s Operations Overview",
+  "tags": ["monitoring", "post-disaster-alert", "kubernetes", "blue-green"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "10s",
   "panels": [
     {
-      "type": "timeseries",
-      "title": "Target Up",
+      "type": "stat",
+      "title": "K8s App NodePort Health",
       "datasource": {"type": "prometheus", "uid": "Prometheus"},
       "targets": [
-        {"expr": "up", "legendFormat": "{% raw %}{{instance}}{% endraw %}"}
+        {
+          "expr": "max(probe_success{job=\"app_health\"})",
+          "refId": "A"
+        }
       ],
-      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8}
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {"text": "DOWN", "color": "red"},
+                "1": {"text": "UP", "color": "green"}
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "green", "value": 1}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {"x": 0, "y": 0, "w": 6, "h": 5}
+    },
+    {
+      "type": "stat",
+      "title": "Targets Up",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [
+        {
+          "expr": "sum(up)",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {"x": 6, "y": 0, "w": 6, "h": 5}
     },
     {
       "type": "timeseries",
-      "title": "Probe Success",
+      "title": "Target Health by Job",
       "datasource": {"type": "prometheus", "uid": "Prometheus"},
       "targets": [
-        {"expr": "probe_success", "legendFormat": "{% raw %}{{instance}}{% endraw %}"}
+        {
+          "expr": "avg by(job)(up)",
+          "legendFormat": "{% raw %}{{job}}{% endraw %}",
+          "refId": "A"
+        }
       ],
-      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8}
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 5}
+    },
+    {
+      "type": "timeseries",
+      "title": "K8s App Probe Success",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [
+        {
+          "expr": "probe_success{job=\"app_health\"}",
+          "legendFormat": "{% raw %}{{instance}}{% endraw %}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {"x": 0, "y": 5, "w": 8, "h": 7}
+    },
+    {
+      "type": "timeseries",
+      "title": "K8s App Probe Duration (s)",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [
+        {
+          "expr": "probe_duration_seconds{job=\"app_health\"}",
+          "legendFormat": "{% raw %}{{instance}}{% endraw %}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {"x": 8, "y": 5, "w": 8, "h": 7}
+    },
+    {
+      "type": "timeseries",
+      "title": "Node CPU Usage (%)",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [
+        {
+          "expr": "100 - (avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+          "legendFormat": "{% raw %}{{instance}}{% endraw %}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {"x": 16, "y": 5, "w": 8, "h": 7}
+    },
+    {
+      "type": "timeseries",
+      "title": "Node Memory Usage (%)",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [
+        {
+          "expr": "100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))",
+          "legendFormat": "{% raw %}{{instance}}{% endraw %}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {"x": 0, "y": 12, "w": 12, "h": 7}
     },
     {
       "type": "timeseries",
       "title": "Prometheus Scrape Duration",
       "datasource": {"type": "prometheus", "uid": "Prometheus"},
       "targets": [
-        {"expr": "scrape_duration_seconds", "legendFormat": "{% raw %}{{job}}{% endraw %}"}
+        {
+          "expr": "scrape_duration_seconds",
+          "legendFormat": "{% raw %}{{job}}{% endraw %}",
+          "refId": "A"
+        }
       ],
-      "gridPos": {"x": 0, "y": 8, "w": 24, "h": 8}
+      "gridPos": {"x": 12, "y": 12, "w": 12, "h": 7}
     }
   ]
 }
