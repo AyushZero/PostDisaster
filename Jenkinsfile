@@ -12,7 +12,9 @@ pipeline {
         booleanParam(name: 'ENABLE_SONAR', defaultValue: false, description: 'Run SonarQube SAST scan')
         booleanParam(name: 'ENABLE_ZAP', defaultValue: false, description: 'Run OWASP ZAP baseline DAST scan against deployed app')
         booleanParam(name: 'ZAP_FAIL_BUILD', defaultValue: false, description: 'Fail build when OWASP ZAP finds actionable issues')
-        string(name: 'SONAR_HOST_URL', defaultValue: '', description: 'SonarQube server URL (required when ENABLE_SONAR=true)')
+        string(name: 'SONAR_HOST_URL', defaultValue: 'https://sonarcloud.io', description: 'Sonar host URL (SonarCloud or self-hosted SonarQube)')
+        string(name: 'SONAR_PROJECT_KEY', defaultValue: '', description: 'Sonar project key (required when ENABLE_SONAR=true)')
+        string(name: 'SONAR_ORGANIZATION', defaultValue: '', description: 'Sonar organization key (required for SonarCloud)')
         string(name: 'ZAP_TARGET_URL', defaultValue: '', description: 'Optional override target URL for ZAP (default: deployed app URL)')
         booleanParam(name: 'ROLLBACK_DEPLOY', defaultValue: false, description: 'Deploy rollback tag instead of current build')
         string(name: 'ROLLBACK_TAG', defaultValue: '', description: 'Required when ROLLBACK_DEPLOY is true')
@@ -64,24 +66,42 @@ pipeline {
             }
             steps {
                 script {
-                    if (!params.SONAR_HOST_URL?.trim()) {
-                        error('SONAR_HOST_URL is required when ENABLE_SONAR=true')
-                    }
-                }
+                    def sonarHost = params.SONAR_HOST_URL?.trim() ? params.SONAR_HOST_URL.trim() : 'https://sonarcloud.io'
+                    def sonarProjectKey = params.SONAR_PROJECT_KEY?.trim()
 
-                withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
-                    sh '''
+                    if (!sonarProjectKey) {
+                        error('SONAR_PROJECT_KEY is required when ENABLE_SONAR=true')
+                    }
+
+                    def sonarArgs = [
+                        "-Dsonar.host.url=${sonarHost}",
+                        "-Dsonar.projectKey=${sonarProjectKey}",
+                        "-Dsonar.projectName=${env.APP_NAME}",
+                        '-Dsonar.sources=src',
+                        '-Dsonar.exclusions=**/node_modules/**,**/.next/**'
+                    ]
+
+                    if (sonarHost.contains('sonarcloud.io')) {
+                        def sonarOrg = params.SONAR_ORGANIZATION?.trim()
+                        if (!sonarOrg) {
+                            error('SONAR_ORGANIZATION is required for SonarCloud scans')
+                        }
+                        sonarArgs.add(3, "-Dsonar.organization=${sonarOrg}")
+                    }
+
+                    def sonarArgsMultiline = sonarArgs.join(' ')
+
+                    withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
+                        sh """
                         docker run --rm \
-                          -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
+                          -e SONAR_HOST_URL="${sonarHost}" \
                           -e SONAR_TOKEN="${SONAR_TOKEN}" \
                           -v "$PWD:/usr/src" \
                           sonarsource/sonar-scanner-cli:latest \
                           sonar-scanner \
-                            -Dsonar.projectKey=${APP_NAME} \
-                            -Dsonar.projectName=${APP_NAME} \
-                            -Dsonar.sources=src \
-                            -Dsonar.exclusions=**/node_modules/**,**/.next/**
-                    '''
+                            ${sonarArgsMultiline}
+                        """
+                    }
                 }
             }
         }
@@ -278,3 +298,4 @@ pipeline {
         }
     }
 }
+
