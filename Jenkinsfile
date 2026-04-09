@@ -178,7 +178,34 @@ pipeline {
                             }
                         }
 
-                        def hostIp = sh(script: "cd terraform/environments/${target} && terraform output -raw app_public_ip", returnStdout: true).trim()
+                                                def hostIp = sh(
+                                                        script: """
+                                                                set +e
+                                                                TF_IP=\$(cd terraform/environments/${target} && terraform output -raw app_public_ip 2>/dev/null)
+                                                                TF_RC=\$?
+                                                                set -e
+
+                                                                TF_IP=\$(printf '%s' "\${TF_IP}" | sed -E 's/\\x1B\\[[0-9;]*[[:alpha:]]//g' | xargs)
+
+                                                                if [[ \${TF_RC} -eq 0 && "\${TF_IP}" =~ ^([0-9]{1,3}\\.){3}[0-9]{1,3}\$ ]]; then
+                                                                    echo "\${TF_IP}"
+                                                                    exit 0
+                                                                fi
+
+                                                                INV_FILE="ansible/inventories/${target}/hosts.generated.yml"
+                                                                if [[ -f "\${INV_FILE}" ]]; then
+                                                                    INV_IP=\$(awk '/ansible_host:/{print \$2; exit}' "\${INV_FILE}" | xargs)
+                                                                    if [[ "\${INV_IP}" =~ ^([0-9]{1,3}\\.){3}[0-9]{1,3}\$ ]]; then
+                                                                        echo "\${INV_IP}"
+                                                                        exit 0
+                                                                    fi
+                                                                fi
+
+                                                                echo "Unable to resolve app host IP for ${target} from Terraform outputs or generated inventory." >&2
+                                                                exit 1
+                                                        """,
+                                                        returnStdout: true
+                                                ).trim()
                         def healthPort = params.DEPLOY_K8S ? '30080' : '3000'
                         sh "curl -fsS http://${hostIp}:${healthPort}/api/health"
 
