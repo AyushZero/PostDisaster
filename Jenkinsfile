@@ -246,6 +246,7 @@ pipeline {
             }
         }
     }
+    }
 
     post {
         success {
@@ -284,7 +285,7 @@ pipeline {
             }
         }
     }
-}
-}
+    }
+
 
 
