@@ -95,6 +95,7 @@
     - "{{ alertmanager_container_name }}"
     - "{{ node_exporter_container_name }}"
     - "{{ blackbox_container_name }}"
+    - "{{ kube_state_metrics_container_name }}"
   register: remove_monitoring_containers
   changed_when: remove_monitoring_containers.rc == 0
   failed_when: false
@@ -134,6 +135,26 @@
       -v {{ monitoring_config_dir }}/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
       {{ blackbox_image }}
       --config.file=/etc/blackbox_exporter/config.yml
+
+- name: Check if k3s kubeconfig exists for kube-state-metrics
+  ansible.builtin.stat:
+    path: /etc/rancher/k3s/k3s.yaml
+  register: k3s_kubeconfig_stat
+
+- name: Start kube-state-metrics
+  ansible.builtin.command:
+    cmd: >-
+      docker run -d
+      --name {{ kube_state_metrics_container_name }}
+      --restart unless-stopped
+      --network host
+      -v /etc/rancher/k3s:/etc/rancher/k3s:ro
+      -v /var/lib/rancher/k3s:/var/lib/rancher/k3s:ro
+      -e KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+      {{ kube_state_metrics_image }}
+      --port={{ kube_state_metrics_host_port }}
+      --telemetry-port=8081
+  when: k3s_kubeconfig_stat.stat.exists
 
 - name: Start Prometheus
   ansible.builtin.command:

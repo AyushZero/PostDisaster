@@ -37,6 +37,10 @@ node_exporter_image: prom/node-exporter:latest
 blackbox_container_name: post-disaster-alert-blackbox-exporter
 blackbox_image: prom/blackbox-exporter:latest
 
+kube_state_metrics_container_name: post-disaster-alert-kube-state-metrics
+kube_state_metrics_image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.13.0
+kube_state_metrics_host_port: 8080
+
 k8s_namespace: post-disaster-alert
 k8s_service_name: post-disaster-alert
 k8s_secret_name: post-disaster-alert-env
