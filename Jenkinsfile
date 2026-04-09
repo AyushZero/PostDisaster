@@ -2,7 +2,6 @@ pipeline {
     agent any
 
     parameters {
-        choice(name: 'DEPLOY_SCOPE', choices: ['dev', 'staging', 'prod', 'all'], description: 'Where to deploy after CI passes')
         booleanParam(name: 'APPLY_INFRA', defaultValue: false, description: 'Run terraform apply (false = plan only)')
         booleanParam(name: 'STRICT_LINT', defaultValue: false, description: 'Fail the build if lint reports errors')
         booleanParam(name: 'DEPLOY_MONITORING', defaultValue: true, description: 'Deploy Prometheus, Grafana, Alertmanager, and exporters')
@@ -141,43 +140,32 @@ pipeline {
                 script {
                     sh 'mkdir -p security-reports'
 
-                    def targets = []
-                    if (params.DEPLOY_SCOPE == 'all') {
-                        targets = ['dev', 'staging', 'prod']
-                    } else {
-                        targets = [params.DEPLOY_SCOPE]
+                    def target = 'dev'
+
+                    sh "bash scripts/jenkins/tf_plan_apply.sh ${target} ${params.APPLY_INFRA}"
+
+                    if (!params.APPLY_INFRA) {
+                        echo "Skipping terraform apply for ${target} because APPLY_INFRA=false; continuing with Ansible deploy on existing infrastructure"
                     }
 
-                    for (target in targets) {
-                        if (target == 'prod') {
-                            input message: 'Approve deployment to prod?', ok: 'Deploy prod'
-                        }
+                    withCredentials([
+                        sshUserPrivateKey(credentialsId: 'EC2_SSH_KEY', keyFileVariable: 'SSH_PRIVATE_KEY_FILE', usernameVariable: 'SSH_REMOTE_USER'),
+                        usernamePassword(credentialsId: 'DOCKERHUB_CREDENTIALS', passwordVariable: 'DOCKER_REGISTRY_PASSWORD', usernameVariable: 'DOCKER_REGISTRY_USERNAME')
+                    ]) {
+                        env.DEPLOY_ENVIRONMENT = target
 
-                        sh "bash scripts/jenkins/tf_plan_apply.sh ${target} ${params.APPLY_INFRA}"
+                        sh "bash scripts/jenkins/ansible_deploy.sh ${target} ${APP_IMAGE_TAG} provision"
 
-                        if (!params.APPLY_INFRA) {
-                            echo "Skipping terraform apply for ${target} because APPLY_INFRA=false; continuing with Ansible deploy on existing infrastructure"
-                        }
-
-                        withCredentials([
-                            sshUserPrivateKey(credentialsId: 'EC2_SSH_KEY', keyFileVariable: 'SSH_PRIVATE_KEY_FILE', usernameVariable: 'SSH_REMOTE_USER'),
-                            usernamePassword(credentialsId: 'DOCKERHUB_CREDENTIALS', passwordVariable: 'DOCKER_REGISTRY_PASSWORD', usernameVariable: 'DOCKER_REGISTRY_USERNAME')
-                        ]) {
-                            env.DEPLOY_ENVIRONMENT = target
-
-                            sh "bash scripts/jenkins/ansible_deploy.sh ${target} ${APP_IMAGE_TAG} provision"
-
-                            if (params.ROLLBACK_DEPLOY) {
-                                if (!params.ROLLBACK_TAG?.trim()) {
-                                    error('ROLLBACK_TAG is required when ROLLBACK_DEPLOY=true')
-                                }
-                                sh "bash scripts/jenkins/ansible_deploy.sh ${target} ${APP_IMAGE_TAG} rollback ${params.ROLLBACK_TAG}"
+                        if (params.ROLLBACK_DEPLOY) {
+                            if (!params.ROLLBACK_TAG?.trim()) {
+                                error('ROLLBACK_TAG is required when ROLLBACK_DEPLOY=true')
+                            }
+                            sh "bash scripts/jenkins/ansible_deploy.sh ${target} ${APP_IMAGE_TAG} rollback ${params.ROLLBACK_TAG}"
+                        } else {
+                            if (params.DEPLOY_K8S) {
+                                sh "bash scripts/jenkins/ansible_deploy.sh ${target} ${APP_IMAGE_TAG} k8s ${params.K8S_DEPLOY_SLOT} ${params.K8S_SWITCH_TRAFFIC}"
                             } else {
-                                if (params.DEPLOY_K8S) {
-                                    sh "bash scripts/jenkins/ansible_deploy.sh ${target} ${APP_IMAGE_TAG} k8s ${params.K8S_DEPLOY_SLOT} ${params.K8S_SWITCH_TRAFFIC}"
-                                } else {
-                                    sh "bash scripts/jenkins/ansible_deploy.sh ${target} ${APP_IMAGE_TAG} deploy"
-                                }
+                                sh "bash scripts/jenkins/ansible_deploy.sh ${target} ${APP_IMAGE_TAG} deploy"
                             }
                         }
 
@@ -197,34 +185,34 @@ pipeline {
                             }
                         }
 
-                                                def hostIp = sh(
-                                                        script: """
-                                                                set +e
-                                                                TF_IP=\$(cd terraform/environments/${target} && terraform output -raw app_public_ip 2>/dev/null)
-                                                                TF_RC=\$?
-                                                                set -e
+                        def hostIp = sh(
+                                script: """
+                                        set +e
+                                        TF_IP=\$(cd terraform/environments/${target} && terraform output -raw app_public_ip 2>/dev/null)
+                                        TF_RC=\$?
+                                        set -e
 
-                                                                TF_IP=\$(printf '%s' "\${TF_IP}" | sed -E 's/\\x1B\\[[0-9;]*[[:alpha:]]//g' | xargs)
+                                        TF_IP=\$(printf '%s' "\${TF_IP}" | sed -E 's/\\x1B\\[[0-9;]*[[:alpha:]]//g' | xargs)
 
-                                                                if [[ \${TF_RC} -eq 0 && "\${TF_IP}" =~ ^([0-9]{1,3}\\.){3}[0-9]{1,3}\$ ]]; then
-                                                                    echo "\${TF_IP}"
-                                                                    exit 0
-                                                                fi
+                                        if [[ \${TF_RC} -eq 0 && "\${TF_IP}" =~ ^([0-9]{1,3}\\.){3}[0-9]{1,3}\$ ]]; then
+                                            echo "\${TF_IP}"
+                                            exit 0
+                                        fi
 
-                                                                INV_FILE="ansible/inventories/${target}/hosts.generated.yml"
-                                                                if [[ -f "\${INV_FILE}" ]]; then
-                                                                    INV_IP=\$(awk '/ansible_host:/{print \$2; exit}' "\${INV_FILE}" | xargs)
-                                                                    if [[ "\${INV_IP}" =~ ^([0-9]{1,3}\\.){3}[0-9]{1,3}\$ ]]; then
-                                                                        echo "\${INV_IP}"
-                                                                        exit 0
-                                                                    fi
-                                                                fi
+                                        INV_FILE="ansible/inventories/${target}/hosts.generated.yml"
+                                        if [[ -f "\${INV_FILE}" ]]; then
+                                            INV_IP=\$(awk '/ansible_host:/{print \$2; exit}' "\${INV_FILE}" | xargs)
+                                            if [[ "\${INV_IP}" =~ ^([0-9]{1,3}\\.){3}[0-9]{1,3}\$ ]]; then
+                                                echo "\${INV_IP}"
+                                                exit 0
+                                            fi
+                                        fi
 
-                                                                echo "Unable to resolve app host IP for ${target} from Terraform outputs or generated inventory." >&2
-                                                                exit 1
-                                                        """,
-                                                        returnStdout: true
-                                                ).trim()
+                                        echo "Unable to resolve app host IP for ${target} from Terraform outputs or generated inventory." >&2
+                                        exit 1
+                                """,
+                                returnStdout: true
+                        ).trim()
                         def healthPort = params.DEPLOY_K8S ? '30080' : '3000'
                         sh "curl -fsS http://${hostIp}:${healthPort}/api/health"
 
@@ -254,7 +242,6 @@ pipeline {
                                 }
                             }
                         }
-                    }
                 }
             }
         }
