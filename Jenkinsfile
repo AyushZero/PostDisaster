@@ -90,17 +90,38 @@ pipeline {
 
                     def sonarArgsMultiline = sonarArgs.join(' ')
 
-                    withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
-                        sh """
-                        docker run --rm \
-                          -e SONAR_HOST_URL="${sonarHost}" \
-                          -e SONAR_TOKEN="${SONAR_TOKEN}" \
-                                                    -v "$WORKSPACE:/usr/src" \
-                                                    -w /usr/src \
-                          sonarsource/sonar-scanner-cli:latest \
-                          sonar-scanner \
-                            ${sonarArgsMultiline}
-                        """
+                    withEnv([
+                        "SONAR_HOST_URL_SAFE=${sonarHost}",
+                        "SONAR_SCANNER_ARGS=${sonarArgsMultiline}"
+                    ]) {
+                        withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
+                            def sonarStatus = sh(
+                                script: '''
+                                    set +e
+                                    docker run --rm \
+                                      -e SONAR_HOST_URL="$SONAR_HOST_URL_SAFE" \
+                                      -e SONAR_TOKEN="$SONAR_TOKEN" \
+                                      -v "$WORKSPACE:/usr/src" \
+                                      -w /usr/src \
+                                      sonarsource/sonar-scanner-cli:latest \
+                                      sonar-scanner $SONAR_SCANNER_ARGS > sonar-scanner.log 2>&1
+                                    scan_rc=$?
+                                    cat sonar-scanner.log
+                                    exit $scan_rc
+                                ''',
+                                returnStatus: true
+                            )
+
+                            if (sonarStatus != 0) {
+                                def sonarLog = readFile('sonar-scanner.log')
+                                if (sonarLog.contains('manual analysis while Automatic Analysis is enabled')) {
+                                    unstable('Sonar scan skipped: disable SonarCloud Automatic Analysis for this project to use CI-based scanner analysis.')
+                                    echo 'SonarCloud project is configured with Automatic Analysis. Disable it in SonarCloud project settings to run scanner analysis from Jenkins.'
+                                } else {
+                                    error('Sonar scanner failed. Check sonar-scanner.log output in the build logs for details.')
+                                }
+                            }
+                        }
                     }
                 }
             }
