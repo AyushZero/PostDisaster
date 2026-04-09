@@ -20,7 +20,7 @@ variable "public_subnet_cidr" {
 
 variable "instance_type" {
   type    = string
-  default = "t3.micro"
+  default = "t3.small"
 }
 
 variable "key_name" {
