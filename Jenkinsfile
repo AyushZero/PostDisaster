@@ -76,7 +76,7 @@ pipeline {
                         "-Dsonar.host.url=${sonarHost}",
                         "-Dsonar.projectKey=${sonarProjectKey}",
                         "-Dsonar.projectName=${env.APP_NAME}",
-                        '-Dsonar.sources=src',
+                        '-Dsonar.sources=.',
                         '-Dsonar.exclusions=**/node_modules/**,**/.next/**'
                     ]
 
@@ -95,7 +95,8 @@ pipeline {
                         docker run --rm \
                           -e SONAR_HOST_URL="${sonarHost}" \
                           -e SONAR_TOKEN="${SONAR_TOKEN}" \
-                          -v "$PWD:/usr/src" \
+                                                    -v "$WORKSPACE:/usr/src" \
+                                                    -w /usr/src \
                           sonarsource/sonar-scanner-cli:latest \
                           sonar-scanner \
                             ${sonarArgsMultiline}
