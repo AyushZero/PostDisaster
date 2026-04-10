@@ -152,6 +152,7 @@
       -v /var/lib/rancher/k3s:/var/lib/rancher/k3s:ro
       -e KUBECONFIG=/etc/rancher/k3s/k3s.yaml
       {{ kube_state_metrics_image }}
+      --kubeconfig=/etc/rancher/k3s/k3s.yaml
       --port={{ kube_state_metrics_host_port }}
       --telemetry-port=8081
   when: k3s_kubeconfig_stat.stat.exists
